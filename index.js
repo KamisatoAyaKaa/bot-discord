@@ -10,12 +10,28 @@ const bank = require("./bank.js");
 
 // ✨ FIX ĐƯỜNG DẪN: Trỏ chính xác vào thư mục taixiu mới chuyển của bạn
 const gameTaiXiu = require("./taixiu/taixiu.js");
-
 const gameTuTien = require("./tutien/index.js"); // Đầu mối Tu Tiên giữ nguyên
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// =========================================================
+// ✨ KÍCH HOẠT CỔNG EXPRESS LÊN TRƯỚC ĐỂ RENDER QUÉT TRÚNG NGAY
+// =========================================================
+const express = require("express");
+const app = express();
+const port = process.env.PORT || 3000;
 
-// Hãy đảm bảo điền mã Token mới, an toàn của bạn vào đây
+app.get("/", (req, res) => {
+  res.send("Thiên Đạo đang vận hành ổn định vạn giới!");
+});
+
+// Bắt buộc phải thêm địa chỉ mạng '0.0.0.0' để Render kết nối được từ bên ngoài
+app.listen(port, "0.0.0.0", () => {
+  console.log(`📡 Cổng mạng đã mở tại port ${port} để đón nhận tín hiệu Ping!`);
+});
+
+// =========================================================
+// KHỞI TẠO DISCORD CLIENT
+// =========================================================
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 const TOKEN = process.env.DISCORD_TOKEN;
 
 client.once("ready", async () => {
@@ -118,19 +134,5 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
-// ==========================================
-// ✨ ĐOẠN CODE GIÚP UPTIMEROBOT BÁO XANH (UP)
-// ==========================================
-const express = require("express");
-const app = express();
-const port = process.env.PORT || 3000;
 
-// Khi UptimeRobot ping vào link, trả về chữ "Online" để hệ thống báo xanh
-app.get("/", (req, res) => {
-  res.send("Thiên Đạo đang vận hành ổn định vạn giới!");
-});
-
-app.listen(port, () => {
-  console.log(`📡 Cổng mạng đã mở tại port ${port} để đón nhận tín hiệu Ping!`);
-});
 client.login(TOKEN);
