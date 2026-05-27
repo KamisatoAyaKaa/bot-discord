@@ -118,5 +118,19 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 });
+// ==========================================
+// ✨ ĐOẠN CODE GIÚP UPTIMEROBOT BÁO XANH (UP)
+// ==========================================
+const express = require("express");
+const app = express();
+const port = process.env.PORT || 3000;
 
+// Khi UptimeRobot ping vào link, trả về chữ "Online" để hệ thống báo xanh
+app.get("/", (req, res) => {
+  res.send("Thiên Đạo đang vận hành ổn định vạn giới!");
+});
+
+app.listen(port, () => {
+  console.log(`📡 Cổng mạng đã mở tại port ${port} để đón nhận tín hiệu Ping!`);
+});
 client.login(TOKEN);
