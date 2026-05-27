@@ -1,150 +1,72 @@
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 
-// Đường dẫn đến file lưu dữ liệu (sẽ nằm cùng thư mục với index.js)
-const DB_PATH = path.join(__dirname, 'database.json');
+// 1. Kết nối tới cơ sở dữ liệu Đám mây MongoDBAtlas
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('🟢 Đã kết nối thành công tới Cloud Database (MongoDB)!'))
+    .catch(err => console.error('🔴 Lỗi kết nối Cloud Database:', err));
 
-// Hàm đọc dữ liệu từ file JSON khi bot chạy lên
-function loadData() {
-    try {
-        if (fs.existsSync(DB_PATH)) {
-            const data = fs.readFileSync(DB_PATH, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.error('❌ Lỗi khi đọc file database.json:', error);
+// 2. Định nghĩa cấu trúc khung (Schema) lưu trữ cho Tu Sĩ
+const PlayerSchema = new mongoose.Schema({
+    _id: String, // Đây chính là ID Discord của người chơi
+    balance: { type: Number, default: 0 },
+    tutien: {
+        initialized: { type: Boolean, default: false },
+        linhCan: { type: String, default: 'Chưa thức tỉnh' },
+        ngoTinh: { type: String, default: 'Chưa đo đạc' },
+        theChat: { type: String, default: 'Phàm Thể' },
+        khiVan: { type: String, default: 'Bình Thường' },
+        canhGioi: { type: String, default: 'Phàm Nhân' },
+        tang: { type: Number, default: 0 },
+        tuVi: { type: Number, default: 0 },
+        tuViCanThiet: { type: Number, default: 100 },
+        lastLuyenCong: { type: String, default: null }
     }
-    return {}; // Trả về đối tượng rỗng nếu chưa có file
-}
+});
 
-// Hàm ghi dữ liệu vào file JSON mỗi khi có thay đổi tiền tệ
-function saveData(data) {
-    try {
-        fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 4), 'utf8');
-    } catch (error) {
-        console.error('❌ Lỗi khi ghi file database.json:', error);
-    }
-}
+// Tạo Model để tương tác với bảng "players"
+const PlayerModel = mongoose.model('Player', PlayerSchema);
 
-// Tải dữ liệu cũ lên bộ nhớ ngay khi bot khởi động
-const userData = loadData(); 
+// Bộ nhớ đệm (Cache) để bot đọc ghi siêu nhanh mà không bị nghẽn mạng Discord
+let memoryCache = {};
 
 module.exports = {
-    // Lấy thông tin ví của người chơi (Tự động khởi tạo nếu là người mới)
-    // Lấy thông tin ví và hồ sơ tu tiên của người chơi
+    // Hàm lấy thông tin người chơi (Nếu chưa có trên mây, nó sẽ tự tạo mới trong cache)
     getPlayer: function(userId) {
-        // Cấu trúc khởi tạo hoàn chỉnh cho một tu sĩ mới
-        const defaultProfile = {
-            balance: 0,
-            lastDaily: null,
-            streak: 0,
-            tutien: {
-                initialized: false,
-                linhCan: 'Chưa thức tỉnh',
-                ngoTinh: 'Chưa đo đạc',     // MỚI
-                theChat: 'Phàm Thể',        // MỚI
-                khiVan: 'Bình Thường',      // MỚI
-                canhGioi: 'Phàm Nhân',
-                tang: 0,
-                tuVi: 0,
-                tuViCanThiet: 100,
-                lastLuyenCong: null
-            }
-        };
-
-        // Nếu người chơi hoàn toàn mới (Chưa có trong database)
-        if (!userData[userId]) {
-            userData[userId] = defaultProfile;
-            this.save();
+        if (!memoryCache[userId]) {
+            memoryCache[userId] = {
+                _id: userId,
+                balance: 0,
+                tutien: {
+                    initialized: false,
+                    linhCan: 'Chưa thức tỉnh',
+                    ngoTinh: 'Chưa đo đạc',
+                    theChat: 'Phàm Thể',
+                    khiVan: 'Bình Thường',
+                    canhGioi: 'Phàm Nhân',
+                    tang: 0,
+                    tuVi: 0,
+                    tuViCanThiet: 100,
+                    lastLuyenCong: null
+                }
+            };
+            // Thử tìm xem trên Đám mây có dữ liệu cũ chưa để nạp đè vào cache
+            PlayerModel.findById(userId).then(doc => {
+                if (doc) memoryCache[userId] = doc.toObject();
+            });
         }
-        
-        // PHÒNG HỜ: Nếu là người chơi cũ đã có tiền nhưng chưa có mục tu tiên
-        if (!userData[userId].tutien) {
-            userData[userId].tutien = defaultProfile.tutien;
-            this.save();
-        }
-        
-        return userData[userId];
+        return memoryCache[userId];
     },
 
-    // Hàm gọi lưu dữ liệu từ các file bên ngoài (như game taixiu.js)
-    save: function() {
-        saveData(userData);
-    },
-
-    // Hàm xử lý Lệnh /daily, /vi và /addtien cho file index.js gọi vào
-    handleBankCommands: async function(interaction) {
-        const userId = interaction.user.id;
-        const username = interaction.user.username;
-        const player = this.getPlayer(userId);
-
-        // 1. Xử lý lệnh điểm danh /daily
-        if (interaction.commandName === 'daily') {
-            await interaction.deferReply();
-
-            const now = new Date();
-            const ONE_DAY = 24 * 60 * 60 * 1000;
-
-            if (player.lastDaily) {
-                const timePassed = now - new Date(player.lastDaily);
-
-                if (timePassed < ONE_DAY) {
-                    const timeLeft = ONE_DAY - timePassed;
-                    const hours = Math.floor(timeLeft / (60 * 60 * 1000));
-                    const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
-                    
-                    return interaction.editReply({ content: `❌ Bạn đã nhận thưởng hôm nay rồi! Hãy quay lại sau **${hours} giờ ${minutes} phút** nữa nhé.` });
-                }
-
-                if (timePassed > ONE_DAY * 2) {
-                    player.streak = 0; 
-                }
+    // Hàm đồng bộ và lưu vĩnh viễn dữ liệu của TẤT CẢ mọi người lên đám mây Cloud
+    save: async function() {
+        try {
+            for (const userId in memoryCache) {
+                const data = memoryCache[userId];
+                await PlayerModel.findByIdAndUpdate(userId, data, { upsert: true });
             }
-
-            player.streak += 1;
-            const reward = player.streak * 50;
-            player.balance += reward;
-            player.lastDaily = now.toISOString();
-
-            // LƯU VÀO FILE CỨNG
-            saveData(userData); 
-
-            return interaction.editReply(`📆 **${username}** đã điểm danh ngày thứ **${player.streak}** liên tiếp!\n💰 Bạn nhận được: **$${reward.toLocaleString()}** (Ví hiện tại: **$${player.balance.toLocaleString()}**)`);
-        }
-
-        // 2. Xử lý lệnh xem ví /vi
-        if (interaction.commandName === 'vi') {
-            await interaction.deferReply();
-            return interaction.editReply(`💰 Tài khoản của **${username}** hiện có: **$${player.balance.toLocaleString()}**`);
-        }
-
-        // 3. LỆNH ADMIN: /ADDTIEN
-        if (interaction.commandName === 'addtien') {
-            const app = await interaction.client.application.fetch();
-            const ownerId = app.owner ? app.owner.id : null;
-
-            if (userId !== ownerId) {
-                return interaction.reply({ 
-                    content: '❌ Bạn không có quyền hạn Admin để sử dụng lệnh tối cao này!', 
-                    ephemeral: true 
-                });
-            }
-
-            const nguoiNhan = interaction.options.getUser('nguoi_nhan');
-            const soTien = interaction.options.getInteger('so_tien');
-
-            if (soTien <= 0) {
-                return interaction.reply({ content: '❌ Số tiền add phải lớn hơn 0!', ephemeral: true });
-            }
-
-            const targetId = nguoiNhan.id; 
-            const targetPlayer = this.getPlayer(targetId);
-            targetPlayer.balance += soTien;
-
-            // LƯU VÀO FILE CỨNG
-            saveData(userData); 
-
-            return interaction.reply(`👑 **ADMIN CHEAT TOOL:** Đã bơm thành công **+$${soTien.toLocaleString()}** vào tài khoản của <@${targetId}>!`);
+            console.log('💾 [Cloud DB] Đã đồng bộ toàn bộ dữ liệu tu tiên lên Đám Mây thành công!');
+        } catch (error) {
+            console.error('🔴 Lỗi khi đồng bộ lên Cloud:', error);
         }
     }
 };
