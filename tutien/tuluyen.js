@@ -37,13 +37,41 @@ async function handleTuLuyen(interaction) {
     let tuViNhanDuoc = Math.floor(baseTuVi * Math.max(1 + totalBonus, 0.1));
 
     // 6. Tiến hành cộng Tu Vi vào nhân vật và lưu vào database
+    // (Đoạn code tính tuViNhanDuoc ở trên giữ nguyên 100%)
+    // 6. Tiến hành cộng Tu Vi vào nhân vật và lưu vào database
     tt.tuVi += tuViNhanDuoc;
-    tt.lastLuyenCong = now.toISOString(); // Lưu lại thời gian vừa tu luyện
-    bank.save(); // Ghi trực tiếp xuống file database.json
+    tt.lastLuyenCong = now.toISOString();
+    bank.save(); // Ghi xuống database.json
 
-    return interaction.reply({
-        content: `🧘 **Vận công thành công!** Đạo hữu nhập định hấp thu tinh hoa trời đất, nhận được **+${tuViNhanDuoc} Tu Vi**. (Hiện có: \`${tt.tuVi} / ${tt.tuViCanThiet}\`)`,
-        ephemeral: true
+    // 🚀 BƯỚC NÂNG CẤP: Import lại Embed và Nút bấm để vẽ lại bảng hồ sơ mới
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+    const embedProfileMoi = new EmbedBuilder()
+        .setColor('#1abc9c')
+        .setTitle(`🧘 ĐẠO ĐỒ HỒ SƠ - THỜI KHÔNG TU LUYỆN`)
+        .setThumbnail(interaction.user.displayAvatarURL())
+        .addFields(
+            { name: '👤 Tu Sĩ', value: `<@${userId}>`, inline: true },
+            { name: '⚔️ Cảnh Giới Hiện Tại', value: `**${tt.canhGioi} ${tt.tang > 0 ? `- Tầng ${tt.tang}` : ''}**`, inline: true },
+            { name: '🔮 Linh Căn Thuộc Tính', value: `${tt.linhCan}`, inline: false },
+            { name: '🧠 Ngộ Tính Tư Chất', value: `${tt.ngoTinh}`, inline: true },
+            { name: '🎲 Khí Vận Định Số', value: `${tt.khiVan}`, inline: true },
+            { name: '🧬 Thể Chất Đặc Biệt', value: `${tt.theChat}`, inline: false },
+            { name: '✨ Tu Vi Tích Lũy', value: `\`${tt.tuVi} / ${tt.tuViCanThiet}\` Điểm`, inline: true }, // Số tu vi mới đã được cập nhật ở đây
+            { name: '🟡 Linh Thạch Sở Hữu', value: `**$${player.balance.toLocaleString()}**`, inline: true }
+        )
+        .setDescription(`*✨ Đạo hữu vừa tu luyện và nhận được **+${tuViNhanDuoc} Tu Vi**!*`)
+        .setFooter({ text: 'Hãy tiếp tục vận công khi kinh mạch ổn định hoặc tiến hành đột phá thiên kiếp' });
+
+    const rowButtons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('tt_luyen_cong').setLabel('🧘 Vận Công Luyện Khí').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('tt_dot_pha').setLabel('⚡ Đột Phá Cảnh Giới').setStyle(ButtonStyle.Danger)
+    );
+
+    // Sử dụng interaction.update để ghi đè trực tiếp lên bảng cũ, tạo hiệu ứng làm mới thời gian thực
+    return interaction.update({ 
+        embeds: [embedProfileMoi], 
+        components: [rowButtons] 
     });
 }
 
