@@ -39,13 +39,16 @@ module.exports = {
             lastDaily: null,
             streak: 0,
             tutien: {
-                initialized: false,   // Đã thức tỉnh linh căn chưa
+                initialized: false,
                 linhCan: 'Chưa thức tỉnh',
+                ngoTinh: 'Chưa đo đạc',     // MỚI
+                theChat: 'Phàm Thể',        // MỚI
+                khiVan: 'Bình Thường',      // MỚI
                 canhGioi: 'Phàm Nhân',
-                tang: 0,              // Tầng 1 -> 9
-                tuVi: 0,              // Tu vi hiện tại
-                tuViCanThiet: 100,    // Tu vi để đạt điều kiện đột phá
-                lastLuyenCong: null   // Thời gian bấm nút vận công gần nhất
+                tang: 0,
+                tuVi: 0,
+                tuViCanThiet: 100,
+                lastLuyenCong: null
             }
         };
 
