@@ -19,7 +19,7 @@ const CAC_CANH_GIOI = [
 async function handleDotPha(interaction) {
     const userId = interaction.user.id;
     const player = bank.getPlayer(userId);
-    const tt = player.tutian;
+    const tt = player.tutien;
 
     // 1. Kiểm tra điều kiện Tu Vi
     if (tt.tuVi < tt.tuViCanThiet) {

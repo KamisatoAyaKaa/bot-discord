@@ -6,7 +6,7 @@ async function xemProfile(interaction) {
     const userId = interaction.user.id;
     const username = interaction.user.username;
     const player = bank.getPlayer(userId);
-    const tt = player.tutian;
+    const tt = player.tutien;
 
     // LẦN ĐẦU NHẬP MÔN: Bốc trọn gói combo số mệnh (Linh Căn + Ngộ Tính + Thể Chất + Khí Vận)
     if (!tt.initialized) {
