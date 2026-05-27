@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd \"c:\\\\Users\\\\DungLT\\\\OneDrive\\\\Máy tính\\\\bot discord\"; node -c index\\.js taixiu\\.js$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

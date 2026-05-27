@@ -1,0 +1,3 @@
+# Bỏ qua file dữ liệu ngân hàng của bot
+database.json
+.env
