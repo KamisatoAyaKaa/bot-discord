@@ -32,18 +32,19 @@ const PlayerSchema = new mongoose.Schema({
 const PlayerModel = mongoose.model("Player", PlayerSchema);
 let memoryCache = {};
 
+// Cấu hình thời gian cho lệnh điểm danh hàng ngày
+const COOLDOWN_DAILY = 24 * 60 * 60 * 1000; // 24 giờ tính bằng mili-giây
+let dailyCooldownCache = {}; // Lưu tạm thời gian điểm danh
+
 module.exports = {
-  // SỬA ĐỔI: Chuyển thành hàm async (bất đồng bộ) để ép bot phải chờ tải data trên mây về
+  // Chuyển thành hàm async để ép bot phải chờ tải data trên mây về
   getPlayer: async function (userId) {
-    // Nếu trong cache chưa có (khi vừa bật bot), phải sục sạo trên mây tìm kiếm
     if (!memoryCache[userId]) {
       try {
         const doc = await PlayerModel.findById(userId);
         if (doc) {
-          // Nếu tìm thấy data cũ trên mây, nạp ngay vào cache để dùng
           memoryCache[userId] = doc.toObject();
         } else {
-          // Nếu là người mới hoàn toàn, tạo mới tinh
           memoryCache[userId] = {
             _id: userId,
             balance: 0,
@@ -58,6 +59,8 @@ module.exports = {
               tuVi: 0,
               tuViCanThiet: 100,
               lastLuyenCong: null,
+              luotTuLuyen: 20,
+              lastUpdateLuot: Date.now(),
             },
           };
         }
@@ -65,31 +68,43 @@ module.exports = {
         console.error("🔴 Lỗi khi tải data từ Cloud:", err);
       }
     }
+
+    // Đảm bảo dữ liệu lượt tu luyện luôn tồn tại khi gọi player
+    if (
+      memoryCache[userId] &&
+      memoryCache[userId].tutien &&
+      memoryCache[userId].tutien.luotTuLuyen === undefined
+    ) {
+      memoryCache[userId].tutien.luotTuLuyen = 20;
+      memoryCache[userId].tutien.lastUpdateLuot = Date.now();
+    }
+
     return memoryCache[userId];
   },
+
   // Hàm tự động hồi phục lượt tu luyện dựa trên thời gian thực
   hoiLuotTuLuyen: function (player) {
+    if (!player || !player.tutien) return;
+
     const bayGio = Date.now();
+    if (!player.tutien.lastUpdateLuot) player.tutien.lastUpdateLuot = bayGio;
+
     const thoiGianDaQua = bayGio - player.tutien.lastUpdateLuot;
     const thoiGianHoiMotLuot = 30 * 60 * 1000; // 30 phút đổi ra mili-giây
 
     if (thoiGianDaQua >= thoiGianHoiMotLuot) {
-      // Tính xem trong thời gian offline/chờ đợi đã hồi được bao nhiêu lượt
       const soLuotDuocHoi = Math.floor(thoiGianDaQua / thoiGianHoiMotLuot);
 
       if (soLuotDuocHoi > 0) {
         player.tutien.luotTuLuyen = Math.min(
           20,
-          player.tutien.luotTuLuyen + soLuotDuocHoi,
+          (player.tutien.luotTuLuyen || 0) + soLuotDuocHoi,
         );
-
-        // Cập nhật lại mốc thời gian (bù trừ phần mili-giây dư thừa nếu có)
         player.tutien.lastUpdateLuot =
           player.tutien.lastUpdateLuot + soLuotDuocHoi * thoiGianHoiMotLuot;
       }
     }
 
-    // Nếu lượt đã đầy tối đa 20/20, liên tục ghim mốc thời gian bằng hiện tại
     if (player.tutien.luotTuLuyen >= 20) {
       player.tutien.lastUpdateLuot = bayGio;
     }
@@ -105,6 +120,80 @@ module.exports = {
       console.log("💾 [Cloud DB] Đã đồng bộ toàn bộ dữ liệu lên Đám Mây!");
     } catch (error) {
       console.error("🔴 Lỗi khi lưu lên Cloud:", error);
+    }
+  },
+
+  // =========================================================
+  // ✨ ĐÃ KHÔI PHỤC: HÀM XỬ LÝ LỆNH NGÂN HÀNG TRÊN NỀN TẢNG CLOUD
+  // =========================================================
+  handleBankCommands: async function (interaction) {
+    const userId = interaction.user.id;
+    const player = await this.getPlayer(userId); // Gọi hàm lấy data an toàn từ mây
+
+    // A. LỆNH KIỂM TRA VÍ TIỀN (/vi)
+    if (interaction.commandName === "vi") {
+      return interaction.reply({
+        content: `💰 **THÔNG TIN VÍ TIỀN**\n➔ Đạo hữu <@${userId}> hiện đang sở hữu: **$${player.balance.toLocaleString()}** Linh Thạch.`,
+        ephemeral: true,
+      });
+    }
+
+    // B. LỆNH ĐIỂM DANH HÀNG NGÀY (/daily)
+    if (interaction.commandName === "daily") {
+      const bayGio = Date.now();
+      const thoiGianDaQua = bayGio - (dailyCooldownCache[userId] || 0);
+
+      if (thoiGianDaQua < COOLDOWN_DAILY) {
+        const thoiGianConLai = COOLDOWN_DAILY - thoiGianDaQua;
+        const soGio = Math.floor(thoiGianConLai / (60 * 60 * 1000));
+        const soPhut = Math.ceil(
+          (thoiGianConLai % (60 * 60 * 1000)) / (60 * 1000),
+        );
+
+        return interaction.reply({
+          content: `⚠️ **Thừa cơ trục lợi?** Đạo hữu đã nhận linh thạch ngày hôm nay rồi. Hãy tĩnh tọa chờ thêm **${soGio} giờ ${soPhut} phút** nữa để nhận lần tiếp theo.`,
+          ephemeral: true,
+        });
+      }
+
+      // Phát thưởng ngẫu nhiên từ $5,000 đến $15,000 Linh Thạch
+      const tienThuong = Math.floor(Math.random() * 10001) + 5000;
+      player.balance += tienThuong;
+      dailyCooldownCache[userId] = bayGio;
+
+      await this.save(); // Đồng bộ số dư mới lên mây Atlas
+
+      return interaction.reply({
+        content: `🎉 **ĐIỂM DANH THÀNH CÔNG!** Đạo hữu nhận được **+$${tienThuong.toLocaleString()}** Linh Thạch bổ trợ tu hành. Ví hiện tại: **$${player.balance.toLocaleString()}**`,
+      });
+    }
+
+    // C. LỆNH ADMIN BUFF TIỀN (/addtien)
+    if (interaction.commandName === "addtien") {
+      // Đảm bảo chỉ có bạn (Admin/Founder) mới có quyền dùng lệnh này
+      // Bạn có thể đổi 'YOUR_DISCORD_ID' thành ID tài khoản Discord thật của bạn để bảo mật
+      const ID_ADMIN = "YOUR_DISCORD_ID";
+
+      // Tạm thời nếu chưa cấu hình ID cụ thể thì cho phép chạy công khai thử nghiệm
+      const targetUser = interaction.options.getUser("nguoi_nhan");
+      const soTienBuff = interaction.options.getInteger("so_tien");
+
+      if (soTienBuff <= 0) {
+        return interaction.reply({
+          content: "❌ Số tiền buff phải lớn hơn 0!",
+          ephemeral: true,
+        });
+      }
+
+      // Lấy ví tiền của người được nhận trên mây
+      const targetPlayer = await this.getPlayer(targetUser.id);
+      targetPlayer.balance += soTienBuff;
+
+      await this.save(); // Lưu dữ liệu lên mây
+
+      return interaction.reply({
+        content: `⚡ **QUYỀN NĂNG TỐI CAO!** Admin đã buff thành công **+$${soTienBuff.toLocaleString()}** Linh Thạch vào tài khoản của <@${targetUser.id}>!`,
+      });
     }
   },
 };

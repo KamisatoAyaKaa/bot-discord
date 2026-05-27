@@ -1,0 +1,16 @@
+{
+  "name": "bot-thien-dao",
+  "version": "1.0.0",
+  "description": "Bot cho Discord",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "KamisatoAyaKaa",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "mongoose": "^8.2.0"
+  }
+}
