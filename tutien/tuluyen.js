@@ -3,7 +3,7 @@ const { PHAM_CHAT_LINH_CAN, NGO_TINH, THE_CHAT } = require('./properties.js');
 
 async function handleTuLuyen(interaction) {
     const userId = interaction.user.id;
-    const player = bank.getPlayer(userId);
+    const player = await bank.getPlayer(userId);
     const tt = player.tutien; // Sử dụng key tutien đã đồng bộ
 
     const now = new Date();

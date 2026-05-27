@@ -5,7 +5,7 @@ const { thucTinhSoMenh } = require('./properties.js'); // Import bộ bốc qu�
 async function xemProfile(interaction) {
     const userId = interaction.user.id;
     const username = interaction.user.username;
-    const player = bank.getPlayer(userId);
+    const player = await bank.getPlayer(userId);
     const tt = player.tutien;
 
     // LẦN ĐẦU NHẬP MÔN: Bốc trọn gói combo số mệnh (Linh Căn + Ngộ Tính + Thể Chất + Khí Vận)
