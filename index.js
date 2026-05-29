@@ -62,7 +62,8 @@ client.once("ready", async () => {
           .setName("so_tien")
           .setDescription("Nhập số tiền muốn buff")
           .setRequired(true),
-      ),
+      )
+      .setDefaultMemberPermissions(0), // ✨ LỚP BẢO MẬT 1: Ẩn lệnh, chỉ hiển thị cho người có quyền Quản trị viên (Admin)
 
     // Đăng ký lệnh Tu Tiên chính thức với Discord
     new SlashCommandBuilder()
@@ -91,11 +92,28 @@ client.on("interactionCreate", async (interaction) => {
   try {
     // 1. Nhóm lệnh tiền tệ ngân hàng (/daily, /vi, /addtien)
     if (interaction.isChatInputCommand()) {
+      // Tách riêng lệnh kiểm tra thông thường
       if (
         interaction.commandName === "daily" ||
-        interaction.commandName === "vi" ||
-        interaction.commandName === "addtien"
+        interaction.commandName === "vi"
       ) {
+        await bank.handleBankCommands(interaction);
+        return;
+      }
+
+      // Kiểm soát chặt chẽ lệnh addtien
+      if (interaction.commandName === "addtien") {
+        // ✨ LỚP BẢO MẬT 2: Kiểm tra trực tiếp quyền hạn trên server
+        if (!interaction.member.permissions.has("Administrator")) {
+          await interaction.reply({
+            content:
+              "❌ **Càn khôn điên đảo!** Đạo hữu không phải Admin, không thể tự ý thay đổi linh thạch của thiên hạ!",
+            ephemeral: true, // Chỉ một mình kẻ "vòi tiền" nhìn thấy dòng cảnh báo quê xệ này
+          });
+          return;
+        }
+
+        // Nếu đúng là Tông chủ / Admin tối cao, cho phép kích hoạt
         await bank.handleBankCommands(interaction);
         return;
       }
