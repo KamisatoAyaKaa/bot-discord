@@ -48,19 +48,23 @@ client.once("ready", async () => {
     new SlashCommandBuilder()
       .setName("vi")
       .setDescription("Kiểm tra số dư tài khoản hiện tại của bạn"),
+
+    // ✨ CẬP NHẬT MÔ TẢ: Hướng dẫn rõ ràng cách Cộng (+) và Trừ (-) linh thạch
     new SlashCommandBuilder()
       .setName("addtien")
-      .setDescription("⚡ Lệnh Admin: Cộng tiền cho một người chơi bất kỳ")
+      .setDescription(
+        "⚡ Lệnh Admin: Thay đổi linh thạch (Số dương để cộng, số âm để trừ)",
+      )
       .addUserOption((option) =>
         option
           .setName("nguoi_nhan")
-          .setDescription("Chọn người bạn muốn buff tiền")
+          .setDescription("Chọn người bạn muốn tác động túi tiền")
           .setRequired(true),
       )
       .addIntegerOption((option) =>
         option
           .setName("so_tien")
-          .setDescription("Nhập số tiền muốn buff")
+          .setDescription("Nhập số tiền (Ví dụ: 5000 để cộng, -5000 để trừ)")
           .setRequired(true),
       )
       .setDefaultMemberPermissions(0), // ✨ LỚP BẢO MẬT 1: Ẩn lệnh, chỉ hiển thị cho người có quyền Quản trị viên (Admin)

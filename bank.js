@@ -168,32 +168,47 @@ module.exports = {
       });
     }
 
-    // C. LỆNH ADMIN BUFF TIỀN (/addtien)
-    if (interaction.commandName === "addtien") {
-      // Đảm bảo chỉ có bạn (Admin/Founder) mới có quyền dùng lệnh này
-      // Bạn có thể đổi 'YOUR_DISCORD_ID' thành ID tài khoản Discord thật của bạn để bảo mật
-      const ID_ADMIN = "YOUR_DISCORD_ID";
-
-      // Tạm thời nếu chưa cấu hình ID cụ thể thì cho phép chạy công khai thử nghiệm
+    // C. LỆNH ADMIN BUFF TIỀN (/addtien) - ĐÃ CẬP NHẬT CỘNG/TRỪ ĐA NĂNG
+    if (
+      interaction.isChatInputCommand() &&
+      interaction.commandName === "addtien"
+    ) {
       const targetUser = interaction.options.getUser("nguoi_nhan");
-      const soTienBuff = interaction.options.getInteger("so_tien");
+      const soTienBuff = interaction.options.getInteger("so_tien"); // Nhận cả số âm và dương
 
-      if (soTienBuff <= 0) {
+      // Gọi lấy hồ sơ ví tiền của người bị tác động trên hệ thống cache/cloud
+      const targetPlayer = await this.getPlayer(targetUser.id);
+      const currentBalance = targetPlayer.balance;
+
+      // 🔄 TRƯỜNG HỢP 1: ADMIN NHẬP SỐ DƯƠNG -> CỘNG TIỀN
+      if (soTienBuff >= 0) {
+        targetPlayer.balance += soTienBuff;
+        await this.save(); // Lưu ngay lên Cloud
+
         return interaction.reply({
-          content: "❌ Số tiền buff phải lớn hơn 0!",
-          ephemeral: true,
+          content: `⚡ **QUYỀN NĂNG TỐI CAO!** Admin đã ban phát **+$${soTienBuff.toLocaleString()}** Linh Thạch vào tài khoản của <@${targetUser.id}>!\n➔ Số dư mới: **$${targetPlayer.balance.toLocaleString()}** Linh Thạch.`,
         });
       }
 
-      // Lấy ví tiền của người được nhận trên mây
-      const targetPlayer = await this.getPlayer(targetUser.id);
-      targetPlayer.balance += soTienBuff;
+      // 📉 TRƯỜNG HỢP 2: ADMIN NHẬP SỐ ÂM -> THU HỒI / TRỪ TIỀN
+      else {
+        const soTienTruTuyetDoi = Math.abs(soTienBuff); // Đổi số âm thành số dương để dễ so sánh (Ví dụ: -5000 thành 5000)
+        let thongBaoKhaQuang = "";
 
-      await this.save(); // Lưu dữ liệu lên mây
+        // Nếu số tiền định trừ vượt quá số linh thạch họ đang có
+        if (soTienTruTuyetDoi > currentBalance) {
+          targetPlayer.balance = 0; // Trực tiếp bóp chết ví tiền, đưa thẳng về 0
+          thongBaoKhaQuang = `💸 **KHẤU TRỪ TRIỆT ĐỂ!** Đạo hữu <@${targetUser.id}> không đủ **$${soTienTruTuyetDoi.toLocaleString()}** Linh Thạch để nộp phạt. Admin đã tịch thu sạch sành sanh toàn bộ đại sản nghiệp, ép số dư về **$0**!`;
+        }
+        // Nếu túi tiền của họ đủ để trừ cuốn chiếu
+        else {
+          targetPlayer.balance -= soTienTruTuyetDoi;
+          thongBaoKhaQuang = `📉 **THU HỒI LINH THẠCH!** Admin đã giáng thiên phạt, thu hồi **-$${soTienTruTuyetDoi.toLocaleString()}** Linh Thạch từ túi của <@${targetUser.id}>!\n➔ Số dư còn lại: **$${targetPlayer.balance.toLocaleString()}** Linh Thạch.`;
+        }
 
-      return interaction.reply({
-        content: `⚡ **QUYỀN NĂNG TỐI CAO!** Admin đã buff thành công **+$${soTienBuff.toLocaleString()}** Linh Thạch vào tài khoản của <@${targetUser.id}>!`,
-      });
+        await this.save(); // Đồng bộ vĩnh viễn dữ liệu mới nộp phạt lên mây
+        return interaction.reply({ content: thongBaoKhaQuang });
+      }
     }
   },
 };
