@@ -15,9 +15,8 @@ let phienCuocHienTai = null;
 module.exports = {
   handleTaiXiu: async function (interaction) {
     const userId = interaction.user.id;
-    const username = interaction.user.username;
 
-    // ✨ FIX LỖI 1: Thêm await để đảm bảo lấy được dữ liệu ví từ Cloud về máy
+    // Đảm bảo lấy được dữ liệu ví từ Cloud về máy trước khi xử lý
     const player = await bank.getPlayer(userId);
 
     // ==========================================
@@ -36,6 +35,7 @@ module.exports = {
       }
 
       // Khởi tạo thông tin phiên cược mới kéo dài 30 giây
+      // ✨ CẬP NHẬT CẤU TRÚC: nguoiChoi lưu theo dạng: { "userId": { "tai": 5000, "chan": 10000 } }
       phienCuocHienTai = {
         dangChay: true,
         thoiGianConLai: 30,
@@ -104,7 +104,7 @@ module.exports = {
               `**Tỉ lệ trả thưởng:**\n` +
               `• Tài/Xỉu/Chẵn/Lẻ: 1:1\n` +
               `• Số cụ thể (3–18): 1:10\n\n` +
-              `⚠️ **LƯU Ý:** Không spam bấm nút để tránh lặp form làm độn tiền cược!\n` +
+              `✨ **ĐẶC BIỆT:** Bạn có thể rải cược nhiều ô cùng lúc! Mỗi ô chỉ được cược 1 lần.\n` +
               `⏱️ Trò chơi đang bắt đầu và đếm ngược: **${time} giây**.`,
           );
       };
@@ -136,50 +136,64 @@ module.exports = {
           const laXiu = tongDiem >= 3 && tongDiem <= 10;
           const laChan = tongDiem % 2 === 0;
 
+          // Gom danh sách các ô thắng trong phiên này
+          const cacODong = [];
+          if (laTai) cacODong.push("tai");
+          if (laXiu) cacODong.push("xiu");
+          if (laChan) cacODong.push("chan");
+          else cacODong.push("le");
+          cacODong.push(`num_${tongDiem}`);
+
           let thongBaoKetQua = `🎲 **KẾT QUẢ XÚC XẮC:** ${xx1} - ${xx2} - ${xx3} ➔ 🌟 Tổng: **${tongDiem}** (${laTai ? "TÀI" : "XỈU"} - ${laChan ? "CHẴN" : "LẺ"})\n\n`;
-          thongBaoKetQua += `📝 **Chi tiết bảng cược danh sách người chơi:**\n`;
+          thongBaoKetQua += `📝 **Chi tiết kết quả bảng cược:**\n`;
 
           let coNguoiChoi = false;
 
-          for (const [idUid, dataCuoc] of Object.entries(
+          // ==========================================
+          // ✨ NÂNG CẤP LOGIC TÍNH THƯỞNG ĐA Ô CƯỢC ĐẦU CUỐI
+          // ==========================================
+          for (const [idUid, danhSachCuaDaCuoc] of Object.entries(
             phienCuocHienTai.nguoiChoi,
           )) {
             coNguoiChoi = true;
-
-            // ✨ FIX LỖI 2: Thêm await để lôi đúng ví tiền của từng con bạc tham gia trên mây về
             const pBank = await bank.getPlayer(idUid);
-            let isWin = false;
-            let thuong = 0;
 
-            if (dataCuoc.cua === "tai" && laTai) {
-              isWin = true;
-              thuong = dataCuoc.tien * 2;
-            } else if (dataCuoc.cua === "xiu" && laXiu) {
-              isWin = true;
-              thuong = dataCuoc.tien * 2;
-            } else if (dataCuoc.cua === "chan" && laChan) {
-              isWin = true;
-              thuong = dataCuoc.tien * 2;
-            } else if (dataCuoc.cua === "le" && !laChan) {
-              isWin = true;
-              thuong = dataCuoc.tien * 2;
-            } else if (
-              dataCuoc.cua.startsWith("num_") &&
-              parseInt(dataCuoc.cua.split("_")[1]) === tongDiem
-            ) {
-              isWin = true;
-              thuong = dataCuoc.tien * 11;
+            let tongThuongNhanVe = 0;
+            let chiTietCuaTungNguoi = [];
+
+            for (const [cuaO, tienDat] of Object.entries(danhSachCuaDaCuoc)) {
+              let tenCuaHienThi = cuaO.toUpperCase();
+              if (cuaO.startsWith("num_"))
+                tenCuaHienThi = `Số ${cuaO.split("_")[1]}`;
+
+              if (cacODong.includes(cuaO)) {
+                // Nếu trúng cửa
+                let tyLeAn = 2; // Hệ số ăn 1:1 trả lại x2 (Gốc + Thưởng)
+                if (cuaO.startsWith("num_")) tyLeAn = 11; // Hệ số ăn 1:10 trả lại x11
+
+                const tienThangO = tienDat * tyLeAn;
+                tongThuongNhanVe += tienThangO;
+                chiTietCuaTungNguoi.push(
+                  `✅ **${tenCuaHienThi}** (+$${(tienThangO - tienDat).toLocaleString()})`,
+                );
+              } else {
+                // Nếu trượt cửa
+                chiTietCuaTungNguoi.push(
+                  `💸 **${tenCuaHienThi}** (-$${tienDat.toLocaleString()})`,
+                );
+              }
             }
 
-            if (isWin) {
-              pBank.balance += thuong;
-              thongBaoKetQua += `🎉 <@${idUid}> cược **${dataCuoc.tenCua}** ($${dataCuoc.tien.toLocaleString()}) ➔ **THẮNG** nhận +$${(thuong - dataCuoc.tien).toLocaleString()}!\n`;
-            } else {
-              thongBaoKetQua += `💸 <@${idUid}> cược **${dataCuoc.tenCua}** ($${dataCuoc.tien.toLocaleString()}) ➔ **THUA**!\n`;
+            // Tiến hành bơm tiền thắng về tài khoản ngân hàng
+            if (tongThuongNhanVe > 0) {
+              pBank.balance += tongThuongNhanVe;
             }
+
+            // Ghi nhận dòng nhật ký tổng hợp lên bảng tin
+            thongBaoKetQua += `👤 <@${idUid}> đặt cược [ ${chiTietCuaTungNguoi.join(", ")} ]\n`;
           }
 
-          // ✨ FIX LỖI 3: Ép đồng bộ kết quả trả thưởng vĩnh viễn lên đám mây MongoDB
+          // Ép đồng bộ tất cả ví tiền sau ván đấu vĩnh viễn lên mây Atlas
           await bank.save();
 
           if (!coNguoiChoi)
@@ -221,6 +235,17 @@ module.exports = {
       }
 
       const cuaChon = interaction.customId.replace("tx_select_", "");
+
+      // 🛡️ CHỐT CHẶN TRƯỚC (UX): Nếu đã cược ô này rồi thì chặn không cho hiện Modal nhập tiền luôn
+      if (
+        phienCuocHienTai.nguoiChoi[userId] &&
+        phienCuocHienTai.nguoiChoi[userId][cuaChon] !== undefined
+      ) {
+        return interaction.reply({
+          content: `⚠️ **Pháp trận đã khóa!** Đạo hữu đã đặt cược vào ô này trước đó rồi. Mỗi cửa chỉ được cược duy nhất một lần một phiên!`,
+          ephemeral: true,
+        });
+      }
 
       const modal = new ModalBuilder()
         .setCustomId(`tx_modal_${cuaChon}`)
@@ -267,6 +292,19 @@ module.exports = {
         });
       }
 
+      // Khởi tạo Object riêng cho người chơi nếu đây là cửa cược đầu tiên của họ trong ván
+      if (!phienCuocHienTai.nguoiChoi[userId]) {
+        phienCuocHienTai.nguoiChoi[userId] = {};
+      }
+
+      // 🛡️ CHỐT CHẶN BACKEND: Đảm bảo tuyệt đối không bị trùng cược ô cũ
+      if (phienCuocHienTai.nguoiChoi[userId][cuaChon] !== undefined) {
+        return await interaction.reply({
+          content: `⚠️ Đạo hữu đã đặt cược vào ô này rồi! Hãy chọn ô khác để rải cơ duyên nhé.`,
+          ephemeral: true,
+        });
+      }
+
       if (player.balance < tienCuoc) {
         return await interaction.reply({
           content: `❌ Bạn không đủ tiền! Ví hiện tại: **$${player.balance.toLocaleString()}**`,
@@ -274,24 +312,18 @@ module.exports = {
         });
       }
 
-      // Tiến hành trừ tiền cược trong ngân hàng chung ngay lập tức
+      // Tiến hành khấu trừ ví tiền cược
       player.balance -= tienCuoc;
+      await bank.save(); // Lưu ngay lập tức lên Cloud DB
 
-      // ✨ FIX LỖI 4: Ép lưu số dư mới của con bạc lên Cloud ngay khi vừa trừ tiền cược đầu ván
-      await bank.save();
+      // Ghi nhận ô cược vào danh mục cá nhân của người chơi
+      phienCuocHienTai.nguoiChoi[userId][cuaChon] = tienCuoc;
 
       let tenCua = cuaChon.toUpperCase();
       if (cuaChon.startsWith("num_")) tenCua = `Số ${cuaChon.split("_")[1]}`;
 
-      // Ghi nhận dữ liệu cược của người này vào hệ thống phiên chung
-      phienCuocHienTai.nguoiChoi[userId] = {
-        cua: cuaChon,
-        tenCua: tenCua,
-        tien: tienCuoc,
-      };
-
       await interaction.reply({
-        content: `✅ Đã đặt cược thành công **$${tienCuoc.toLocaleString()}** vào cửa **${tenCua}**! Hãy chờ hết thời gian đếm ngược kết quả nhé.`,
+        content: `✅ Đã đặt cược thành công **$${tienCuoc.toLocaleString()}** vào cửa **${tenCua}**!\n➔ Bạn vẫn có thể tiếp tục click chọn các cửa khác để cược thêm trước khi hết giờ!`,
         ephemeral: true,
       });
     }
