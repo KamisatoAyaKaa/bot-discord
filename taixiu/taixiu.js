@@ -311,7 +311,7 @@ module.exports = {
           ephemeral: true,
         });
       }
-      // Tiến hành khấu trừ ví tiền cược
+      // Tiến hành khấu trừ ví tiền cược//
       player.balance -= tienCuoc;
       await bank.save(); // Lưu ngay lập tức lên Cloud DB
 
