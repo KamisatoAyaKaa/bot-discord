@@ -17,7 +17,6 @@ module.exports = {
     const userId = interaction.user.id;
 
     // Đảm bảo lấy được dữ liệu ví từ Cloud về máy trước khi xử lý
-    const player = await bank.getPlayer(userId);
 
     // ==========================================
     // 1. NGƯỜI CHƠI GÕ LỆNH /TAIXIU
@@ -292,6 +291,14 @@ module.exports = {
         });
       }
 
+      const player = await bank.getPlayer(userId);
+
+      if (player.balance < tienCuoc) {
+        return await interaction.reply({
+          content: `❌ Bạn không đủ tiền! Ví hiện tại: **$${player.balance.toLocaleString()}**`,
+          ephemeral: true,
+        });
+      }
       // Khởi tạo Object riêng cho người chơi nếu đây là cửa cược đầu tiên của họ trong ván
       if (!phienCuocHienTai.nguoiChoi[userId]) {
         phienCuocHienTai.nguoiChoi[userId] = {};
@@ -304,14 +311,6 @@ module.exports = {
           ephemeral: true,
         });
       }
-
-      if (player.balance < tienCuoc) {
-        return await interaction.reply({
-          content: `❌ Bạn không đủ tiền! Ví hiện tại: **$${player.balance.toLocaleString()}**`,
-          ephemeral: true,
-        });
-      }
-
       // Tiến hành khấu trừ ví tiền cược
       player.balance -= tienCuoc;
       await bank.save(); // Lưu ngay lập tức lên Cloud DB
