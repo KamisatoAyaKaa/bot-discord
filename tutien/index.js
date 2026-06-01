@@ -1,39 +1,60 @@
+const { EmbedBuilder } = require("discord.js"); // ✨ FIX LỖI: Thêm import EmbedBuilder bị thiếu
 const { xemProfile } = require("./profile.js");
-const { handleTuLuyen } = require("./tuluyen.js"); // Import file tu luyện mới tạo
+const { handleTuLuyen } = require("./tuluyen.js");
 const { handleDotPha } = require("./dotpha.js");
 const npcManager = require("./npc.js");
 const bank = require("../bank.js");
 const { GoogleGenAI } = require("@google/genai");
+
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
 module.exports = {
+  // Đầu mối trung tâm tiếp nhận toàn bộ tương tác từ file index.js chuyển sang
   handleTuTien: async function (interaction) {
-    // 1. Nếu người chơi gõ lệnh gạch chéo /tutien
-    // Tìm đến đoạn này trong file tutien/index.js
-    if (
-      interaction.isChatInputCommand() &&
-      interaction.commandName === "tutien"
-    ) {
-      // SỬA ĐOẠN NÀY: Thêm { ephemeral: true } vào trong hàm deferReply
-      await interaction.deferReply({ ephemeral: true });
-      return xemProfile(interaction);
+    // ==========================================
+    // 🧭 PHÂN LUỒNG ĐIỀU PHỐI CÁC LỆNH GẠCH CHÉO (/)
+    // ==========================================
+    if (interaction.isChatInputCommand()) {
+      const cmd = interaction.commandName;
+
+      if (cmd === "tutien") {
+        await interaction.deferReply({ ephemeral: true });
+        return xemProfile(interaction);
+      }
+
+      // ✨ FIX CHÍNH: Gọi chính xác các hàm xử lý bên dưới khi trúng lệnh tương ứng
+      if (cmd === "cuointc") {
+        return this.handleCuoiNPC(interaction);
+      }
+
+      if (cmd === "songtu") {
+        return this.handleSongTu(interaction);
+      }
+
+      if (cmd === "trochuyen") {
+        return this.handleTroChuyenAI(interaction);
+      }
     }
 
-    // 2. Nếu người chơi ấn vào nút bấm Vận Công trên bảng Profile
-    if (interaction.isButton() && interaction.customId === "tt_luyen_cong") {
-      return handleTuLuyen(interaction); // Chuyển hướng sang file tuluyen.js mới
-    }
+    // ==========================================
+    // 🎛️ PHÂN LUỒNG ĐIỀU PHỐI CÁC NÚT BẤM (BUTTON)
+    // ==========================================
+    if (interaction.isButton()) {
+      if (interaction.customId === "tt_luyen_cong") {
+        return handleTuLuyen(interaction);
+      }
 
-    // 3. Nếu người chơi ấn vào nút bấm Đột Phá Cảnh Giới
-    if (interaction.isButton() && interaction.customId === "tt_dot_pha") {
-      return handleDotPha(interaction);
+      if (interaction.customId === "tt_dot_pha") {
+        return handleDotPha(interaction);
+      }
     }
   },
-  // Logic khi người chơi gõ lệnh cưới (hoặc tạo nút bấm)
+
+  // Logic khi người chơi gõ lệnh cưới
   handleCuoiNPC: async function (interaction) {
     const userId = interaction.user.id;
     const player = await bank.getPlayer(userId);
 
-    // Kiểm tra xem đã có vợ chưa
     if (player.tutien.daoLu && player.tutien.daoLu.hasPartner) {
       return interaction.reply({
         content:
@@ -42,7 +63,6 @@ module.exports = {
       });
     }
 
-    // Giả sử người chơi chọn cưới Tuyết Nhi
     const npcSelected = npcManager.DANH_SACH_NPC["tuyet_nhi"];
 
     if (player.balance < npcSelected.giaCuoi) {
@@ -52,7 +72,6 @@ module.exports = {
       });
     }
 
-    // Khấu trừ linh thạch và gán vợ
     player.balance -= npcSelected.giaCuoi;
     player.tutien.daoLu = {
       hasPartner: true,
@@ -66,6 +85,8 @@ module.exports = {
       content: `🎉 **THÀNH THÂN ĐẠI CÁT!** Đạo hữu đã tiêu hao **$${npcSelected.giaCuoi.toLocaleString()}** Linh Thạch, chính thức rước **${npcSelected.ten}** (${npcSelected.xuatThan}) về làm Đạo Lữ đồng môn! Từ nay gắn kết vận mệnh, cùng nhau nghịch thiên.`,
     });
   },
+
+  // Logic khi người chơi gõ lệnh song tu
   handleSongTu: async function (interaction) {
     const userId = interaction.user.id;
     const player = await bank.getPlayer(userId);
@@ -79,7 +100,7 @@ module.exports = {
     }
 
     const bayGio = Date.now();
-    const thoiGianCho = 2 * 60 * 60 * 1000; // Cooldown 2 tiếng một lần song tu
+    const thoiGianCho = 2 * 60 * 60 * 1000;
     const daQua = bayGio - (player.tutien.daoLu.lastSongTu || 0);
 
     if (daQua < thoiGianCho) {
@@ -90,14 +111,11 @@ module.exports = {
       });
     }
 
-    // Lấy thông tin chỉ số buff của vợ
     const npcInfo = npcManager.DANH_SACH_NPC[player.tutien.daoLu.npcId];
 
-    // Tính toán tu vi nhận được (Gốc ngẫu nhiên từ 50-100 nhân với hệ số buff của vợ)
     const tuViGoc = Math.floor(Math.random() * 51) + 50;
     const tuViThucTe = Math.floor(tuViGoc * npcInfo.buffExp);
 
-    // Cộng tu vi và tăng nhẹ điểm thân mật
     player.tutien.tuVi += tuViThucTe;
     player.tutien.daoLu.thanMat += 5;
     player.tutien.daoLu.lastSongTu = bayGio;
@@ -108,11 +126,12 @@ module.exports = {
       content: `🧘‍♂️ **VẬN CÔNG SONG TU!** Bạn và **${npcInfo.ten}** cùng nhau ngồi xếp bằng, linh lực hòa quyện dòng chảy giao thoa.\n➔ Nhận được **+${tuViThucTe} Tu Vi** (Đã kích hoạt buff x${npcInfo.buffExp} từ Đạo Lữ).\n➔ Điểm thân mật tăng lên: \`${player.tutien.daoLu.thanMat} Pts\`.`,
     });
   },
+
+  // Logic khi người chơi gõ lệnh trò chuyện AI tự do
   handleTroChuyenAI: async function (interaction) {
     const userId = interaction.user.id;
     const player = await bank.getPlayer(userId);
 
-    // 1. Check xem đã có vợ chưa
     if (!player.tutien.daoLu || !player.tutien.daoLu.hasPartner) {
       return interaction.reply({
         content:
@@ -121,32 +140,26 @@ module.exports = {
       });
     }
 
-    // 2. Lấy nội dung người chơi gõ và thông tin vợ
     const tinNhanCuaBan = interaction.options.getString("noi_dung");
     const npcInfo = npcManager.DANH_SACH_NPC[player.tutien.daoLu.npcId];
-    const thanMat = player.tutien.daoLu.thanMat;
 
-    // Gọi thông báo đang "suy nghĩ" để tránh bị quá 3s timeout của Discord
     await interaction.deferReply();
 
     try {
-      // 3. Triệu hồi AI và ép nhập vai theo Prompt cá tính
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash", // Dòng model siêu tốc, phản hồi dưới 1 giây
+        model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: tinNhanCuaBan }] }],
         config: {
-          systemInstruction: npcInfo.promptAI, // Ép AI đóng vai Tiên Nữ
-          temperature: 0.7, // Độ sáng tạo vừa phải để giữ đúng tính cách
+          systemInstruction: npcInfo.promptAI,
+          temperature: 0.7,
         },
       });
 
       const loiTienNu = response.text;
 
-      // 4. Cộng nhẹ 1 điểm thân mật vì đã dành thời gian tâm sự
       player.tutien.daoLu.thanMat += 1;
       await bank.save();
 
-      // 5. Trả về Embed giao diện trò chuyện
       const embedAI = new EmbedBuilder()
         .setColor(
           player.tutien.daoLu.npcId === "tuyet_nhi" ? "#90e0ef" : "#ff5555",
