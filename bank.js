@@ -26,12 +26,12 @@ const PlayerSchema = new mongoose.Schema({
     lastLuyenCong: { type: String, default: null },
     luotTuLuyen: { type: Number, default: 20 }, // Mặc định vào game có sẵn 20 lượt
     lastUpdateLuot: { type: Number, default: Date.now }, // Mốc thời gian tính lượt hồi
-  },
-  daoLu: {
-    hasPartner: { type: Boolean, default: false }, // Đã cưới/thu nhận NPC chưa
-    npcId: { type: String, default: null }, // ID của NPC nữ đang đồng hành
-    thanMat: { type: Number, default: 0 }, // Điểm thân mật (Càng cao song tu càng nhiều exp)
-    lastSongTu: { type: Number, default: 0 }, // Cooldown thời gian song tu
+    daoLu: {
+      hasPartner: { type: Boolean, default: false }, // Đã cưới/thu nhận NPC chưa
+      npcId: { type: String, default: null }, // ID của NPC nữ đang đồng hành
+      thanMat: { type: Number, default: 0 }, // Điểm thân mật (Càng cao song tu càng nhiều exp)
+      lastSongTu: { type: Number, default: 0 }, // Cooldown thời gian song tu
+    },
   },
 });
 
@@ -67,11 +67,38 @@ module.exports = {
               lastLuyenCong: null,
               luotTuLuyen: 20,
               lastUpdateLuot: Date.now(),
+              daoLu: {
+                hasPartner: false,
+                npcId: null,
+                thanMat: 0,
+                lastSongTu: 0,
+              },
             },
           };
         }
       } catch (err) {
         console.error("🔴 Lỗi khi tải data từ Cloud:", err);
+      }
+    }
+
+    // Nếu dữ liệu cũ lưu daoLu top-level, chuyển vào tutien.daoLu để tương thích với code hiện tại
+    if (memoryCache[userId]) {
+      if (
+        memoryCache[userId].daoLu &&
+        (!memoryCache[userId].tutien || !memoryCache[userId].tutien.daoLu)
+      ) {
+        memoryCache[userId].tutien = memoryCache[userId].tutien || {};
+        memoryCache[userId].tutien.daoLu = memoryCache[userId].daoLu;
+        delete memoryCache[userId].daoLu;
+      }
+
+      if (memoryCache[userId].tutien && !memoryCache[userId].tutien.daoLu) {
+        memoryCache[userId].tutien.daoLu = {
+          hasPartner: false,
+          npcId: null,
+          thanMat: 0,
+          lastSongTu: 0,
+        };
       }
     }
 
