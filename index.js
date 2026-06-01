@@ -158,10 +158,15 @@ client.on("interactionCreate", async (interaction) => {
       return;
     }
 
-    // 3. Chuyển tiếp toàn bộ tương tác Tu Tiên sang folder tutien xử lý
+    // =========================================================
+    // 3. ✨ CẬP NHẬT CHỐT CHẶN: Chuyển tiếp cả 4 lệnh Tu Tiên sang folder xử lý
+    // =========================================================
     if (
       (interaction.isChatInputCommand() &&
-        interaction.commandName === "tutien") ||
+        (interaction.commandName === "tutien" ||
+          interaction.commandName === "cuointc" ||
+          interaction.commandName === "songtu" ||
+          interaction.commandName === "trochuyen")) || // Thêm 3 con đường dẫn mạch linh lực mới
       (interaction.isButton() && interaction.customId.startsWith("tt_"))
     ) {
       await gameTuTien.handleTuTien(interaction);
