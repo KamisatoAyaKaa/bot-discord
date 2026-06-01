@@ -54,13 +54,24 @@ module.exports = {
       }
     } catch (err) {
       console.error("🔴 Lỗi điều phối hệ thống Tu Tiên:", err);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction
-          .reply({
-            content: "❌ Trục trặc hệ thống điều phối linh lực!",
-            ephemeral: true,
-          })
-          .catch(() => {});
+      try {
+        if (interaction.deferred && !interaction.replied) {
+          await interaction
+            .editReply({
+              content:
+                "❌ Trục trặc hệ thống điều phối linh lực! Xin thử lại sau.",
+            })
+            .catch(() => {});
+        } else if (!interaction.replied) {
+          await interaction
+            .reply({
+              content: "❌ Trục trặc hệ thống điều phối linh lực!",
+              ephemeral: true,
+            })
+            .catch(() => {});
+        }
+      } catch (replyErr) {
+        console.error("🔴 Lỗi khi phản hồi sau lỗi Tu Tiên:", replyErr);
       }
     }
   },

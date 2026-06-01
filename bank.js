@@ -1,9 +1,16 @@
 require("dotenv").config();
 const mongoose = require("mongoose");
 
+// Tắt buffering để Mongoose không chờ vô hạn khi DB chưa kết nối
+mongoose.set("bufferCommands", false);
+
 // 1. Kết nối tới Cloud Database
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 5000,
+  })
   .then(() =>
     console.log("🟢 Đã kết nối thành công tới Cloud Database (MongoDB)!"),
   )
@@ -37,7 +44,30 @@ const PlayerSchema = new mongoose.Schema({
 
 const PlayerModel = mongoose.model("Player", PlayerSchema);
 let memoryCache = {};
-
+const createDefaultPlayer = (userId) => ({
+  _id: userId,
+  balance: 0,
+  tutien: {
+    initialized: false,
+    linhCan: "Chưa thức tỉnh",
+    ngoTinh: "Chưa đo đạc",
+    theChat: "Phàm Thể",
+    khiVan: "Bình Thường",
+    canhGioi: "Phàm Nhân",
+    tang: 0,
+    tuVi: 0,
+    tuViCanThiet: 100,
+    lastLuyenCong: null,
+    luotTuLuyen: 20,
+    lastUpdateLuot: Date.now(),
+    daoLu: {
+      hasPartner: false,
+      npcId: null,
+      thanMat: 0,
+      lastSongTu: 0,
+    },
+  },
+});
 // Cấu hình thời gian cho lệnh điểm danh hàng ngày
 const COOLDOWN_DAILY = 24 * 60 * 60 * 1000; // 24 giờ tính bằng mili-giây
 let dailyCooldownCache = {}; // Lưu tạm thời gian điểm danh
@@ -78,6 +108,7 @@ module.exports = {
         }
       } catch (err) {
         console.error("🔴 Lỗi khi tải data từ Cloud:", err);
+        memoryCache[userId] = createDefaultPlayer(userId);
       }
     }
 
