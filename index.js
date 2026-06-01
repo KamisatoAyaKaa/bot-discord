@@ -75,6 +75,29 @@ client.once("ready", async () => {
       .setDescription(
         "🧘 Bước vào con đường tu tiên nghịch thiên cải mệnh, thức tỉnh linh căn",
       ),
+    new SlashCommandBuilder()
+      .setName("cuointc")
+      .setDescription(
+        "🎎 Tiêu hao linh thạch, cưới một vị Tiên Nữ về làm Đạo Lữ",
+      ),
+    new SlashCommandBuilder()
+      .setName("songtu")
+      .setDescription(
+        "🧘‍♂️ Cùng Đạo Lữ vận chuyển chu thiên, gia tăng tốc độ bạt tiến tu vi",
+      ),
+    new SlashCommandBuilder()
+      .setName("trochuyen")
+      .setDescription(
+        "💬 Truyền âm nhập mật, trò chuyện tự do với vị Đạo Lữ của bạn",
+      )
+      .addStringOption((option) =>
+        option
+          .setName("noi_dung")
+          .setDescription(
+            "Nhập lời bạn muốn nói với nàng (Ví dụ: Nàng đang làm gì đó?)",
+          )
+          .setRequired(true),
+      ),
   ].map((command) => command.toJSON());
 
   const rest = new REST({ version: "10" }).setToken(TOKEN);

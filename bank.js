@@ -27,6 +27,12 @@ const PlayerSchema = new mongoose.Schema({
     luotTuLuyen: { type: Number, default: 20 }, // Mặc định vào game có sẵn 20 lượt
     lastUpdateLuot: { type: Number, default: Date.now }, // Mốc thời gian tính lượt hồi
   },
+  daoLu: {
+    hasPartner: { type: Boolean, default: false }, // Đã cưới/thu nhận NPC chưa
+    npcId: { type: String, default: null }, // ID của NPC nữ đang đồng hành
+    thanMat: { type: Number, default: 0 }, // Điểm thân mật (Càng cao song tu càng nhiều exp)
+    lastSongTu: { type: Number, default: 0 }, // Cooldown thời gian song tu
+  },
 });
 
 const PlayerModel = mongoose.model("Player", PlayerSchema);
