@@ -317,12 +317,43 @@ module.exports = {
         });
 
       return await interaction.editReply({ embeds: [embedAI] });
-    } catch (error) {
-      console.error("🔴 Lỗi linh lực AI bị nghẽn:", error);
-      return await interaction.editReply({
-        content:
-          "❌ Pháp trận truyền âm gặp trục trặc, Tiên Nữ đang nhập định hoặc API Key cung cấp không hợp lệ, hãy thử lại sau!",
-      });
+    } catch (err) {
+      console.error("🔴 Lỗi điều phối hệ thống Tu Tiên:", err);
+
+      // ✨ FIX DỨT ĐIỂM: Kiểm tra toàn diện trạng thái gói tin trước khi gửi phản hồi lỗi
+      try {
+        if (interaction.deferred) {
+          // Nếu đã dùng deferReply trước đó
+          await interaction
+            .editReply({
+              content:
+                "❌ Trục trặc hệ thống điều phối linh lực! Xin hãy thử lại sau.",
+            })
+            .catch(() => {});
+        } else if (interaction.replied) {
+          // Nếu đã dùng reply hoặc update trước đó, gửi một tin nhắn phụ đi kèm chống treo luồng
+          await interaction
+            .followUp({
+              content:
+                "❌ Phát sinh lỗi ngầm khi vận chuyển chu thiên, linh lực hỗn loạn!",
+              ephemeral: true,
+            })
+            .catch(() => {});
+        } else {
+          // Nếu chưa có bất kỳ phản hồi nào
+          await interaction
+            .reply({
+              content: "❌ Trục trặc hệ thống điều phối linh lực!",
+              ephemeral: true,
+            })
+            .catch(() => {});
+        }
+      } catch (replyErr) {
+        console.error(
+          "🔴 Không thể gửi thông báo lỗi đến người chơi:",
+          replyErr.message,
+        );
+      }
     }
   },
 };
