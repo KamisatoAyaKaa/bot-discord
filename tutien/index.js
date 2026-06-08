@@ -28,32 +28,39 @@ module.exports = {
       // ==========================================
       // 🧭 PHÂN LUỒNG ĐIỀU PHỐI CÁC LỆNH GẠCH CHÉO (/)
       // ==========================================
+      // ==========================================
+      // 🧭 PHÂN LUỒNG ĐIỀU PHỐI CÁC LỆNH GẠCH CHÉO (/)
+      // ==========================================
       if (interaction.isChatInputCommand()) {
         const cmd = interaction.commandName;
 
+        // ✨ GIẢI PHÁP AN TOÀN TUYỆT ĐỐI: Chỉ gọi deferReply nếu lệnh ĐÓ CHƯA ĐƯỢC HOÃN BINH từ trước
+        if (!interaction.deferred) {
+          if (cmd === "tutien") {
+            await interaction.deferReply({ ephemeral: true }).catch(() => {});
+          } else {
+            await interaction.deferReply().catch(() => {});
+          }
+        }
+
+        // Sau khi đã đảm bảo đã được defer an toàn, điều hướng thẳng tới hàm con xử lý logic
         if (cmd === "tutien") {
-          await interaction.deferReply({ ephemeral: true });
           return xemProfile(interaction);
         }
 
-        // ✨ THÊM MỚI: Tiếp nhận luồng lệnh thiết kế Tiên Nữ động vào DB
         if (cmd === "taodaolu") {
-          await interaction.deferReply();
           return this.handleTaoDaoLuVaoDB(interaction);
         }
 
         if (cmd === "cuointc") {
-          await interaction.deferReply();
           return this.handleCuoiNPC(interaction);
         }
 
         if (cmd === "songtu") {
-          await interaction.deferReply();
           return this.handleSongTu(interaction);
         }
 
         if (cmd === "trochuyen") {
-          await interaction.deferReply();
           return this.handleTroChuyenAI(interaction);
         }
       }
