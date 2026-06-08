@@ -192,18 +192,24 @@ module.exports = {
   },
 
   // Hàm lưu vĩnh viễn dữ liệu từ cache lên Cloud
+  // Tìm hàm save() hiện tại trong bank.js và dán đè đoạn này:
   save: async function () {
     try {
       for (const userId in memoryCache) {
         const data = memoryCache[userId];
         await PlayerModel.findByIdAndUpdate(userId, data, { upsert: true });
+
+        // ✨ THẦN THÔNG ĐẬP CACHE: Xóa dữ liệu trên RAM sau khi lưu
+        // Ép lượt gọi lệnh tiếp theo phải query trực tiếp từ MongoDB Atlas về
+        delete memoryCache[userId];
       }
-      console.log("💾 [Cloud DB] Đã đồng bộ toàn bộ dữ liệu lên Đám Mây!");
+      console.log(
+        "💾 [Cloud DB] Đã đồng bộ toàn bộ dữ liệu lên Đám Mây và làm sạch bộ nhớ đệm!",
+      );
     } catch (error) {
       console.error("🔴 Lỗi khi lưu lên Cloud:", error);
     }
   },
-
   // Hàm xử lý lệnh ngân hàng trên nền tảng Cloud
   handleBankCommands: async function (interaction) {
     const userId = interaction.user.id;
