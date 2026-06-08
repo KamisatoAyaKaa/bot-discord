@@ -76,24 +76,35 @@ module.exports = {
   },
 
   // Logic khi người chơi gõ lệnh cưới
+  // Logic khi người chơi gõ lệnh cưới
   handleCuoiNPC: async function (interaction) {
     const userId = interaction.user.id;
     const player = await bank.getPlayer(userId);
 
-    if (player.tutien.daoLu && player.tutien.daoLu.hasPartner) {
-      return interaction.reply({
+    // ✨ BƯỚC ĐỆM AN TOÀN: Tự động khởi tạo trường daoLu nếu dữ liệu người chơi chưa có
+    if (!player.tutien.daoLu) {
+      player.tutien.daoLu = {
+        hasPartner: false,
+        npcId: null,
+        thanMat: 0,
+        lastSongTu: 0,
+      };
+    }
+
+    // ✨ SỬA LỖI 1: Thay .reply bằng .editReply và bỏ ephemeral
+    if (player.tutien.daoLu.hasPartner) {
+      return interaction.editReply({
         content:
           "⚠️ **Tham lam vô độ!** Đạo hữu đã có một vị Đạo Lữ đồng hành rồi, không thể kết nạp thêm!",
-        ephemeral: true,
       });
     }
 
-    const npcSelected = npcManager.DAN_SACH_NPC["tuyet_nhi"];
+    const npcSelected = npcManager.DANH_SACH_NPC["tuyet_nhi"];
 
+    // ✨ SỬA LỖI 2: Thay .reply bằng .editReply và bỏ ephemeral
     if (player.balance < npcSelected.giaCuoi) {
-      return interaction.reply({
+      return interaction.editReply({
         content: `❌ **Nghèo túng đường tu!** Đạo hữu cần \`$${npcSelected.giaCuoi.toLocaleString()}\` Linh Thạch để rước **${npcSelected.ten}** làm Đạo Lữ. Bạn hiện chỉ có \`$${player.balance.toLocaleString()}\`.`,
-        ephemeral: true,
       });
     }
 
@@ -106,7 +117,9 @@ module.exports = {
     };
 
     await bank.save();
-    return interaction.reply({
+
+    // ✨ SỬA LỖI 3: Thay .reply bằng .editReply cho dòng thông báo thành hôn đại cát
+    return interaction.editReply({
       content: `🎉 **THÀNH THÂN ĐẠI CÁT!** Đạo hữu đã tiêu hao **$${npcSelected.giaCuoi.toLocaleString()}** Linh Thạch, chính thức rước **${npcSelected.ten}** (${npcSelected.xuatThan}) về làm Đạo Lữ đồng môn! Từ nay gắn kết vận mệnh, cùng nhau nghịch thiên.`,
     });
   },
