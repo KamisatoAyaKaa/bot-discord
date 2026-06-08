@@ -6,7 +6,21 @@ const npcManager = require("./npc.js");
 const bank = require("../bank.js");
 const { GoogleGenAI } = require("@google/genai");
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let ai = null;
+if (process.env.GEMINI_API_KEY) {
+  try {
+    ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  } catch (e) {
+    console.error(
+      "🔴 Thất bại khi thiết lập thực thể Gemini AI (Có thể sai định dạng Key):",
+      e.message,
+    );
+  }
+} else {
+  console.warn(
+    "⚠️ Cảnh báo: GEMINI_API_KEY chưa được khai báo trong file .env!",
+  );
+}
 
 module.exports = {
   // Đầu mối trung tâm tiếp nhận toàn bộ tương tác từ file index.js chuyển sang
