@@ -16,7 +16,7 @@ mongoose
   )
   .catch((err) => console.error("🔴 Lỗi kết nối Cloud Database:", err));
 
-// 2. Định nghĩa cấu trúc khung (Schema)
+// 2. Định nghĩa cấu trúc khung (Schema) Người chơi
 const PlayerSchema = new mongoose.Schema({
   _id: String,
   balance: { type: Number, default: 0 },
@@ -43,6 +43,22 @@ const PlayerSchema = new mongoose.Schema({
 });
 
 const PlayerModel = mongoose.model("Player", PlayerSchema);
+
+// =========================================================
+// ✨ THÊM MỚI: Định nghĩa cấu trúc lưu trữ Tiên Các động của Server
+// =========================================================
+const NpcSchema = new mongoose.Schema({
+  npcId: { type: String, unique: true },
+  ten: String,
+  tinhCach: String,
+  xuatThan: { type: String, default: "Tự Do Tán Tu" },
+  giaCuoi: { type: Number, default: 100000 },
+  buffExp: { type: Number, default: 1.3 },
+  promptAI: String,
+});
+
+const NpcModel = mongoose.model("TuTien_NPC", NpcSchema);
+
 let memoryCache = {};
 const createDefaultPlayer = (userId) => ({
   _id: userId,
@@ -68,6 +84,7 @@ const createDefaultPlayer = (userId) => ({
     },
   },
 });
+
 // Cấu hình thời gian cho lệnh điểm danh hàng ngày
 const COOLDOWN_DAILY = 24 * 60 * 60 * 1000; // 24 giờ tính bằng mili-giây
 let dailyCooldownCache = {}; // Lưu tạm thời gian điểm danh
@@ -187,14 +204,11 @@ module.exports = {
     }
   },
 
-  // =========================================================
-  // ✨ ĐÃ KHÔI PHỤC: HÀM XỬ LÝ LỆNH NGÂN HÀNG TRÊN NỀN TẢNG CLOUD
-  // =========================================================
+  // Hàm xử lý lệnh ngân hàng trên nền tảng Cloud
   handleBankCommands: async function (interaction) {
     const userId = interaction.user.id;
-    const player = await this.getPlayer(userId); // Gọi hàm lấy data an toàn từ mây
+    const player = await this.getPlayer(userId);
 
-    // A. LỆNH KIỂM TRA VÍ TIỀN (/vi)
     if (interaction.commandName === "vi") {
       return interaction.reply({
         content: `💰 **THÔNG TIN VÍ TIỀN**\n➔ Đạo hữu <@${userId}> hiện đang sở hữu: **$${player.balance.toLocaleString()}** Linh Thạch.`,
@@ -202,7 +216,6 @@ module.exports = {
       });
     }
 
-    // B. LỆNH ĐIỂM DANH HÀNG NGÀY (/daily)
     if (interaction.commandName === "daily") {
       const bayGio = Date.now();
       const thoiGianDaQua = bayGio - (dailyCooldownCache[userId] || 0);
@@ -220,59 +233,52 @@ module.exports = {
         });
       }
 
-      // Phát thưởng ngẫu nhiên từ $5,000 đến $15,000 Linh Thạch
       const tienThuong = Math.floor(Math.random() * 10001) + 5000;
       player.balance += tienThuong;
       dailyCooldownCache[userId] = bayGio;
 
-      await this.save(); // Đồng bộ số dư mới lên mây Atlas
+      await this.save();
 
       return interaction.reply({
         content: `🎉 **ĐIỂM DANH THÀNH CÔNG!** Đạo hữu nhận được **+$${tienThuong.toLocaleString()}** Linh Thạch bổ trợ tu hành. Ví hiện tại: **$${player.balance.toLocaleString()}**`,
       });
     }
 
-    // C. LỆNH ADMIN BUFF TIỀN (/addtien) - ĐÃ CẬP NHẬT CỘNG/TRỪ ĐA NĂNG
     if (
       interaction.isChatInputCommand() &&
       interaction.commandName === "addtien"
     ) {
       const targetUser = interaction.options.getUser("nguoi_nhan");
-      const soTienBuff = interaction.options.getInteger("so_tien"); // Nhận cả số âm và dương
+      const soTienBuff = interaction.options.getInteger("so_tien");
 
-      // Gọi lấy hồ sơ ví tiền của người bị tác động trên hệ thống cache/cloud
       const targetPlayer = await this.getPlayer(targetUser.id);
       const currentBalance = targetPlayer.balance;
 
-      // 🔄 TRƯỜNG HỢP 1: ADMIN NHẬP SỐ DƯƠNG -> CỘNG TIỀN
       if (soTienBuff >= 0) {
         targetPlayer.balance += soTienBuff;
-        await this.save(); // Lưu ngay lên Cloud
+        await this.save();
 
         return interaction.reply({
           content: `⚡ **QUYỀN NĂNG TỐI CAO!** Admin đã ban phát **+$${soTienBuff.toLocaleString()}** Linh Thạch vào tài khoản của <@${targetUser.id}>!\n➔ Số dư mới: **$${targetPlayer.balance.toLocaleString()}** Linh Thạch.`,
         });
-      }
-
-      // 📉 TRƯỜNG HỢP 2: ADMIN NHẬP SỐ ÂM -> THU HỒI / TRỪ TIỀN
-      else {
-        const soTienTruTuyetDoi = Math.abs(soTienBuff); // Đổi số âm thành số dương để dễ so sánh (Ví dụ: -5000 thành 5000)
+      } else {
+        const soTienTruTuyetDoi = Math.abs(soTienBuff);
         let thongBaoKhaQuang = "";
 
-        // Nếu số tiền định trừ vượt quá số linh thạch họ đang có
         if (soTienTruTuyetDoi > currentBalance) {
-          targetPlayer.balance = 0; // Trực tiếp bóp chết ví tiền, đưa thẳng về 0
+          targetPlayer.balance = 0;
           thongBaoKhaQuang = `💸 **KHẤU TRỪ TRIỆT ĐỂ!** Đạo hữu <@${targetUser.id}> không đủ **$${soTienTruTuyetDoi.toLocaleString()}** Linh Thạch để nộp phạt. Admin đã tịch thu sạch sành sanh toàn bộ đại sản nghiệp, ép số dư về **$0**!`;
-        }
-        // Nếu túi tiền của họ đủ để trừ cuốn chiếu
-        else {
+        } else {
           targetPlayer.balance -= soTienTruTuyetDoi;
           thongBaoKhaQuang = `📉 **THU HỒI LINH THẠCH!** Admin đã giáng thiên phạt, thu hồi **-$${soTienTruTuyetDoi.toLocaleString()}** Linh Thạch từ túi của <@${targetUser.id}>!\n➔ Số dư còn lại: **$${targetPlayer.balance.toLocaleString()}** Linh Thạch.`;
         }
 
-        await this.save(); // Đồng bộ vĩnh viễn dữ liệu mới nộp phạt lên mây
+        await this.save();
         return interaction.reply({ content: thongBaoKhaQuang });
       }
     }
   },
+
+  // ✨ XUẤT MODEL NPC RA NGOÀI ĐỂ SỬ DỤNG
+  NpcModel,
 };

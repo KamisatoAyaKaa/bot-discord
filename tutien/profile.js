@@ -30,7 +30,7 @@ async function xemProfile(interaction) {
     tt.tuVi = 0;
     tt.tuViCanThiet = 100;
 
-    // ✨ CẤP SẴN 20 LƯỢT CHO TÂN THỦ KHI KHỞI TẠO
+    // CẤP SẴN 20 LƯỢT CHO TÂN THỦ KHI KHỞI TẠO
     tt.luotTuLuyen = 20;
     tt.lastUpdateLuot = Date.now();
 
@@ -54,11 +54,25 @@ async function xemProfile(interaction) {
     return interaction.editReply({ embeds: [embedWelcome] });
   }
 
-  // =========================================================
-  // ✨ BƯỚC NÂNG CẤP: GỌI HÀM HỒI LƯỢT TRƯỚC KHI VẼ HỒ SƠ CHÍNH
-  // =========================================================
+  // GỌI HÀM HỒI LƯỢT TRƯỚC KHI VẼ HỒ SƠ CHÍNH
   if (typeof bank.hoiLuotTuLuyen === "function") {
     bank.hoiLuotTuLuyen(player);
+  }
+
+  // =========================================================
+  // ✨ THÊM MỚI ĐỘNG: TRUY VẤN TÊN VÀ THÔNG TIN VỢ TỪ DATABASE
+  // =========================================================
+  let thongTinDaoLu = "👤 *Cô đơn lẻ bóng (Chưa kết nạp Đạo Lữ)*";
+
+  if (tt.daoLu && tt.daoLu.hasPartner) {
+    // Tìm kiếm linh thức Tiên Nữ động trên MongoDB Cloud
+    const npcInfo = await bank.NpcModel.findOne({ npcId: tt.daoLu.npcId });
+    if (npcInfo) {
+      thongTinDaoLu = `🎎 **${npcInfo.ten}** (${npcInfo.xuatThan})\n➔ 💞 Thân mật: \`${tt.daoLu.thanMat} Pts\` | Buff: \`x${npcInfo.buffExp}\` Exp`;
+    } else {
+      // Trường hợp khẩn cấp nếu ai đó xoá NPC khỏi DB nhưng người chơi vẫn đang cưới
+      thongTinDaoLu = `🎎 Đạo Lữ (Mã tra cứu: \`${tt.daoLu.npcId}\`)\n➔ 💞 Thân mật: \`${tt.daoLu.thanMat} Pts\``;
+    }
   }
 
   // GIAO DIỆN HỒ SƠ ĐẠO ĐỒ CHÍNH (Hiển thị khi đã khởi tạo nhân vật xong)
@@ -77,6 +91,10 @@ async function xemProfile(interaction) {
       { name: "🧠 Ngộ Tính Tư Chất", value: `${tt.ngoTinh}`, inline: true },
       { name: "🎲 Khí Vận Định Số", value: `${tt.khiVan}`, inline: true },
       { name: "🧬 Thể Chất Đặc Biệt", value: `${tt.theChat}`, inline: false },
+
+      // ✨ TRƯỜNG THÔNG TIN ĐẠO LỮ ĐƯỢC CHÈN CHÍNH XÁC VÀO ĐÂY:
+      { name: "❤️ Duyên Phận Đạo Lữ", value: thongTinDaoLu, inline: false },
+
       {
         name: "✨ Tu Vi Tích Lũy",
         value: `\`${tt.tuVi} / ${tt.tuViCanThiet}\` Điểm`,

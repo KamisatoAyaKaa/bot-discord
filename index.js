@@ -75,11 +75,45 @@ client.once("ready", async () => {
       .setDescription(
         "🧘 Bước vào con đường tu tiên nghịch thiên cải mệnh, thức tỉnh linh căn",
       ),
+
+    // ✨ SỬA MỚI 1: Lệnh tạo Đạo Lữ ném thẳng thông tin lên Database chung
+    new SlashCommandBuilder()
+      .setName("taodaolu")
+      .setDescription(
+        "🎨 Thiết kế Tiên Nữ động gửi vào kho Tiên Các chung (Tốn 150,000 Linh Thạch)",
+      )
+      .addStringOption((option) =>
+        option
+          .setName("ten")
+          .setDescription(
+            "Đặt tên cho Tiên Nữ (Ví dụ: Lieu Nhu Yen, To Thap Nhat)",
+          )
+          .setRequired(true),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("tinh_cach")
+          .setDescription(
+            "Mô tả nét tính cách của nàng để AI đóng vai (Ví dụ: Hay ghen, diu dang, kieu ky)",
+          )
+          .setRequired(true),
+      ),
+
+    // ✨ SỬA MỚI 2: Đổi lệnh cuointc thành dạng nhập Mã tra cứu động từ Database
     new SlashCommandBuilder()
       .setName("cuointc")
       .setDescription(
-        "🎎 Tiêu hao linh thạch, cưới một vị Tiên Nữ về làm Đạo Lữ",
+        "🎎 Tiêu hao linh thạch, rước một vị Tiên Nữ từ kho Tiên Các về làm Đạo Lữ",
+      )
+      .addStringOption((option) =>
+        option
+          .setName("ma_tien_nu")
+          .setDescription(
+            "Nhập Mã tra cứu viết liền không dấu của Tiên Nữ (Ví dụ: lieu_nhu_yen, tuyet_nhi)",
+          )
+          .setRequired(true),
       ),
+
     new SlashCommandBuilder()
       .setName("songtu")
       .setDescription(
@@ -159,14 +193,15 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // =========================================================
-    // 3. ✨ CẬP NHẬT CHỐT CHẶN: Chuyển tiếp cả 4 lệnh Tu Tiên sang folder xử lý
+    // 3. ✨ SỬA MỚI 3: Đã mở rộng chốt chặn để chuyển cả 5 lệnh Tu Tiên xuống folder xử lý
     // =========================================================
     if (
       (interaction.isChatInputCommand() &&
         (interaction.commandName === "tutien" ||
+          interaction.commandName === "taodaolu" || // Cho phép lệnh thiết kế vợ đi qua cửa này
           interaction.commandName === "cuointc" ||
           interaction.commandName === "songtu" ||
-          interaction.commandName === "trochuyen")) || // Thêm 3 con đường dẫn mạch linh lực mới
+          interaction.commandName === "trochuyen")) ||
       (interaction.isButton() && interaction.customId.startsWith("tt_"))
     ) {
       await gameTuTien.handleTuTien(interaction);

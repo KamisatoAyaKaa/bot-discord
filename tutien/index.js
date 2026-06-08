@@ -2,8 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const { xemProfile } = require("./profile.js");
 const { handleTuLuyen } = require("./tuluyen.js");
 const { handleDotPha } = require("./dotpha.js");
-const npcManager = require("./npc.js");
-const bank = require("../bank.js");
+const bank = require("../bank.js"); // Tra cứu trực tiếp dữ liệu mây qua bank
 const { GoogleGenAI } = require("@google/genai");
 
 let ai = null;
@@ -37,9 +36,14 @@ module.exports = {
           return xemProfile(interaction);
         }
 
-        // ✨ FIX ĐÃ THÔNG MẠCH: Kích hoạt deferReply trước khi gọi hàm con dùng editReply
+        // ✨ THÊM MỚI: Tiếp nhận luồng lệnh thiết kế Tiên Nữ động vào DB
+        if (cmd === "taodaolu") {
+          await interaction.deferReply();
+          return this.handleTaoDaoLuVaoDB(interaction);
+        }
+
         if (cmd === "cuointc") {
-          await interaction.deferReply(); // Khai mở luồng chờ cho Discord để đồng bộ với editReply phía dưới
+          await interaction.deferReply();
           return this.handleCuoiNPC(interaction);
         }
 
@@ -90,12 +94,68 @@ module.exports = {
     }
   },
 
-  // Logic khi người chơi gõ lệnh cưới
+  // ✨ THÊM MỚI: Logic bốc tách thông số, dệt sinh mệnh mới lưu vào Database Server
+  handleTaoDaoLuVaoDB: async function (interaction) {
+    const userId = interaction.user.id;
+    const player = await bank.getPlayer(userId);
+    const GIA_TAO_NPC = 150000; // Chi phí tiêu tốn linh thạch khi tự tạo
+
+    if (player.balance < GIA_TAO_NPC) {
+      return interaction.editReply({
+        content: `❌ **Nghèo túng đường tu!** Đạo hữu cần \`$${GIA_TAO_NPC.toLocaleString()}\` Linh Thạch để dệt nên một sinh mệnh mới vào Tiên Các. Bạn hiện chỉ có \`$${player.balance.toLocaleString()}\`.`,
+      });
+    }
+
+    const ten = interaction.options.getString("ten").trim();
+    const tinhCach = interaction.options.getString("tinh_cach").trim();
+
+    // Thuật toán làm sạch chuỗi: Khử dấu tiếng Việt, biến đổi khoảng trắng thành dấu gạch dưới để làm mã tra cứu
+    const npcId = ten
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s]/g, "")
+      .replace(/\s+/g, "_");
+
+    // Rà soát xem mã ID Tiên Nữ này đã bị trùng lặp trên Database mây chưa
+    const checkTrung = await bank.NpcModel.findOne({ npcId });
+    if (checkTrung) {
+      return interaction.editReply({
+        content: `⚠️ **Duyên pháp trùng lặp!** Trong Tiên Các đã có một vị Tiên Nữ danh hiệu tương tự hoặc trùng mã tra cứu (\`${npcId}\`), vui lòng đặt tên khác biệt!`,
+      });
+    }
+
+    // Ép Prompt AI định hình phong thái ngôn từ kiếm hiệp
+    const promptAI = `Bạn là ${ten}, một nữ tu sĩ tiên phong và là Đạo Lữ (vợ) của người đang nói chuyện. Bạn có đặc điểm tính cách: ${tinhCach}. Hãy luôn xưng là 'Thiếp' hoặc '${ten}' và gọi người kia là 'Phu quân' hoặc 'Đạo hữu'. Tuyệt đối không được nói mình là AI, hãy trả lời ngắn gọn dưới 3 câu theo văn phong kiếm hiệp, tu tiên huyền huyễn cổ trang.`;
+
+    // Khấu khấu linh thạch từ túi tiền người khởi tạo
+    player.balance -= GIA_TAO_NPC;
+    const playerCache = await bank.getPlayer(userId);
+    playerCache.balance = player.balance;
+    await bank.save();
+
+    // Đẩy gói tin dữ liệu Tiên Nữ mới lên MongoDB
+    const npcMoi = new bank.NpcModel({
+      npcId,
+      ten,
+      tinhCach,
+      xuatThan: `${interaction.user.username} Tạo Ra`,
+      giaCuoi: 100000, // Chi phí cho người sau rước về làm vợ là 100k linh thạch
+      buffExp: 1.3, // Chỉ số buff exp gốc mặc định
+      promptAI,
+    });
+    await npcMoi.save();
+
+    return interaction.editReply({
+      content: `✨ **TẠO HÓA SINH LINH!** Đạo hữu đã tiêu hao **$${GIA_TAO_NPC.toLocaleString()}** Linh Thạch. Khai mở trận pháp, thành công đưa Tiên Nữ **${ten}** vào danh sách Tiên Các chung của Server!\n➔ *Mã tra cứu kết hôn:* \`${npcId}\`\n➔ Từ bây giờ, bất kỳ ai trên máy chủ cũng có thể dùng lệnh \`/cuointc\` nhập mã trên để rước nàng đồng hành!`,
+    });
+  },
+
+  // ✨ ĐÃ ĐẠI TƯ: Logic kết hôn kéo dữ liệu trực tiếp bằng lệnh quét động trên DB mây
   handleCuoiNPC: async function (interaction) {
     const userId = interaction.user.id;
     const player = await bank.getPlayer(userId);
 
-    // ✨ BƯỚC ĐỆM AN TOÀN: Tự động khởi tạo trường daoLu nếu dữ liệu người chơi chưa có
     if (!player.tutien.daoLu) {
       player.tutien.daoLu = {
         hasPartner: false,
@@ -112,7 +172,19 @@ module.exports = {
       });
     }
 
-    const npcSelected = npcManager.DANH_SACH_NPC["tuyet_nhi"];
+    const maTraCuu = interaction.options
+      .getString("ma_tien_nu")
+      .toLowerCase()
+      .trim();
+
+    // 🌐 TRUY VẤN ĐỘNG: Quét kho dữ liệu MongoDB mây tìm kiếm Tiên Nữ
+    const npcSelected = await bank.NpcModel.findOne({ npcId: maTraCuu });
+
+    if (!npcSelected) {
+      return interaction.editReply({
+        content: `❌ **Tìm kiếm vô vọng!** Mã Tiên Nữ \`${maTraCuu}\` không tồn tại trong kho lưu trữ Tiên Các. Hãy kiểm tra lại chính xác mã hoặc tự thiết kế bằng lệnh \`/taodaolu\`!`,
+      });
+    }
 
     if (player.balance < npcSelected.giaCuoi) {
       return interaction.editReply({
@@ -120,10 +192,11 @@ module.exports = {
       });
     }
 
+    // Khấu trừ linh thạch và gán mã định danh Đạo Lữ động
     player.balance -= npcSelected.giaCuoi;
     player.tutien.daoLu = {
       hasPartner: true,
-      npcId: npcSelected.id,
+      npcId: npcSelected.npcId,
       thanMat: 10,
       lastSongTu: 0,
     };
@@ -131,11 +204,11 @@ module.exports = {
     await bank.save();
 
     return interaction.editReply({
-      content: `🎉 **THÀNH THÂN ĐẠI CÁT!** Đạo hữu đã tiêu hao **$${npcSelected.giaCuoi.toLocaleString()}** Linh Thạch, chính thức rước **${npcSelected.ten}** (${npcSelected.xuatThan}) về làm Đạo Lữ đồng môn! Từ nay gắn kết vận mệnh, cùng nhau nghịch thiên.`,
+      content: `🎉 **THÀNH THÂN ĐẠI CÁT!** Đạo hữu đã tiêu hao **$${npcSelected.giaCuoi.toLocaleString()}** Linh Thạch, chính thức rước **${npcSelected.ten}** (${npcSelected.xuatThan}) về làm Đạo Lữ phủ đệ! Từ nay gắn kết vận mệnh, cùng nhau nghịch thiên cải mệnh!`,
     });
   },
 
-  // Logic khi người chơi gõ lệnh song tu
+  // ✨ ĐÃ ĐẠI TƯ: Logic song tu kéo thông số buffExp động từ Database
   handleSongTu: async function (interaction) {
     const userId = interaction.user.id;
     const player = await bank.getPlayer(userId);
@@ -158,7 +231,17 @@ module.exports = {
       });
     }
 
-    const npcInfo = npcManager.DANH_SACH_NPC[player.tutien.daoLu.npcId];
+    // 🌐 TRUY VẤN ĐỘNG: Lấy chỉ số nhân Exp của Tiên Nữ trên DB mây
+    const npcInfo = await bank.NpcModel.findOne({
+      npcId: player.tutien.daoLu.npcId,
+    });
+
+    if (!npcInfo) {
+      return interaction.editReply({
+        content:
+          "❌ **Linh thức tiêu tán!** Không tìm thấy dữ liệu gốc của vị Đạo Lữ này trong hệ thống Tiên Các Server.",
+      });
+    }
 
     const tuViGoc = Math.floor(Math.random() * 51) + 50;
     const tuViThucTe = Math.floor(tuViGoc * npcInfo.buffExp);
@@ -174,7 +257,7 @@ module.exports = {
     });
   },
 
-  // Logic khi người chơi gõ lệnh trò chuyện AI tự do
+  // ✨ ĐÃ ĐẠI TƯ: Trò chuyện AI kéo chỉ thị đóng vai (Prompt động) từ Database mây
   handleTroChuyenAI: async function (interaction) {
     const userId = interaction.user.id;
     const player = await bank.getPlayer(userId);
@@ -186,15 +269,33 @@ module.exports = {
       });
     }
 
+    if (!ai) {
+      return interaction.editReply({
+        content:
+          "❌ **Linh thông gián đoạn!** Hệ thống Tiên Nữ AI hiện chưa được khởi tạo đúng cách hoặc sai cấu hình API Key trong file `.env`!",
+      });
+    }
+
     const tinNhanCuaBan = interaction.options.getString("noi_dung");
-    const npcInfo = npcManager.DANH_SACH_NPC[player.tutien.daoLu.npcId];
+
+    // 🌐 TRUY VẤN ĐỘNG: Rút chỉ thị systemInstruction được người tạo tùy biến từ MongoDB lên
+    const npcInfo = await bank.NpcModel.findOne({
+      npcId: player.tutien.daoLu.npcId,
+    });
+
+    if (!npcInfo) {
+      return interaction.editReply({
+        content:
+          "❌ **Kinh mạch đứt đoạn!** Không bốc tách được linh hồn nhập vai của Đạo Lữ từ Database mây!",
+      });
+    }
 
     try {
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: tinNhanCuaBan }] }],
         config: {
-          systemInstruction: npcInfo.promptAI,
+          systemInstruction: npcInfo.promptAI, // Ép AI đóng vai theo chỉ thị động trên mây
           temperature: 0.7,
         },
       });
@@ -205,16 +306,14 @@ module.exports = {
       await bank.save();
 
       const embedAI = new EmbedBuilder()
-        .setColor(
-          player.tutien.daoLu.npcId === "tuyet_nhi" ? "#90e0ef" : "#ff5555",
-        )
+        .setColor("#ff5555")
         .setTitle(`🎎 Đạo Lữ Phản Hồi: ${npcInfo.ten}`)
         .addFields(
           { name: `💬 Lời của đạo hữu:`, value: `*\"${tinNhanCuaBan}\"*` },
           { name: `🌸 ${npcInfo.ten} đáp:`, value: `**\"${loiTienNu}\"**` },
         )
         .setFooter({
-          text: `📊 Thân mật: ${player.tutien.daoLu.thanMat} Pts | Hệ thống Tiên Nữ AI thần thông`,
+          text: `📊 Thân mật: ${player.tutien.daoLu.thanMat} Pts | Định Ước Tiên Các Động trên MongoDB mây`,
         });
 
       return await interaction.editReply({ embeds: [embedAI] });
@@ -222,7 +321,7 @@ module.exports = {
       console.error("🔴 Lỗi linh lực AI bị nghẽn:", error);
       return await interaction.editReply({
         content:
-          "❌ Pháp trận truyền âm gặp trục trặc, Tiên Nữ đang nhập định hoặc sai cấu hình API Key, hãy thử lại sau!",
+          "❌ Pháp trận truyền âm gặp trục trặc, Tiên Nữ đang nhập định hoặc API Key cung cấp không hợp lệ, hãy thử lại sau!",
       });
     }
   },
