@@ -23,8 +23,9 @@ module.exports = {
           return xemProfile(interaction);
         }
 
-        // Lệnh cưới xử lý nhanh, dùng reply trực tiếp để tránh treo interaction
+        // ✨ FIX ĐÃ THÔNG MẠCH: Kích hoạt deferReply trước khi gọi hàm con dùng editReply
         if (cmd === "cuointc") {
+          await interaction.deferReply(); // Khai mở luồng chờ cho Discord để đồng bộ với editReply phía dưới
           return this.handleCuoiNPC(interaction);
         }
 
@@ -76,7 +77,6 @@ module.exports = {
   },
 
   // Logic khi người chơi gõ lệnh cưới
-  // Logic khi người chơi gõ lệnh cưới
   handleCuoiNPC: async function (interaction) {
     const userId = interaction.user.id;
     const player = await bank.getPlayer(userId);
@@ -91,7 +91,6 @@ module.exports = {
       };
     }
 
-    // ✨ SỬA LỖI 1: Thay .reply bằng .editReply và bỏ ephemeral
     if (player.tutien.daoLu.hasPartner) {
       return interaction.editReply({
         content:
@@ -101,7 +100,6 @@ module.exports = {
 
     const npcSelected = npcManager.DANH_SACH_NPC["tuyet_nhi"];
 
-    // ✨ SỬA LỖI 2: Thay .reply bằng .editReply và bỏ ephemeral
     if (player.balance < npcSelected.giaCuoi) {
       return interaction.editReply({
         content: `❌ **Nghèo túng đường tu!** Đạo hữu cần \`$${npcSelected.giaCuoi.toLocaleString()}\` Linh Thạch để rước **${npcSelected.ten}** làm Đạo Lữ. Bạn hiện chỉ có \`$${player.balance.toLocaleString()}\`.`,
@@ -118,7 +116,6 @@ module.exports = {
 
     await bank.save();
 
-    // ✨ SỬA LỖI 3: Thay .reply bằng .editReply cho dòng thông báo thành hôn đại cát
     return interaction.editReply({
       content: `🎉 **THÀNH THÂN ĐẠI CÁT!** Đạo hữu đã tiêu hao **$${npcSelected.giaCuoi.toLocaleString()}** Linh Thạch, chính thức rước **${npcSelected.ten}** (${npcSelected.xuatThan}) về làm Đạo Lữ đồng môn! Từ nay gắn kết vận mệnh, cùng nhau nghịch thiên.`,
     });
@@ -147,7 +144,7 @@ module.exports = {
       });
     }
 
-    const npcInfo = npcManager.DAN_SACH_NPC[player.tutien.daoLu.npcId];
+    const npcInfo = npcManager.DANH_SACH_NPC[player.tutien.daoLu.npcId];
 
     const tuViGoc = Math.floor(Math.random() * 51) + 50;
     const tuViThucTe = Math.floor(tuViGoc * npcInfo.buffExp);
@@ -169,7 +166,6 @@ module.exports = {
     const player = await bank.getPlayer(userId);
 
     if (!player.tutien.daoLu || !player.tutien.daoLu.hasPartner) {
-      // ✨ FIX: Đổi sang editReply vì luồng chính đã hứng deferReply từ đầu
       return interaction.editReply({
         content:
           "⚠️ Đạo hữu chưa có Đạo Lữ đồng hành, định truyền âm nhập mật với hư vô sao? Hãy dùng `/cuointc` trước!",
@@ -177,10 +173,9 @@ module.exports = {
     }
 
     const tinNhanCuaBan = interaction.options.getString("noi_dung");
-    const npcInfo = npcManager.DAN_SACH_NPC[player.tutien.daoLu.npcId];
+    const npcInfo = npcManager.DANH_SACH_NPC[player.tutien.daoLu.npcId];
 
     try {
-      // Gọi thần thông từ mô hình Gemini AI
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: [{ role: "user", parts: [{ text: tinNhanCuaBan }] }],
