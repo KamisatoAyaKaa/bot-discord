@@ -23,9 +23,8 @@ module.exports = {
           return xemProfile(interaction);
         }
 
-        // ✨ BẢO VỆ 3 GIÂY: Kích hoạt deferReply trước khi xử lý logic nặng từ DB/Cloud
+        // Lệnh cưới xử lý nhanh, dùng reply trực tiếp để tránh treo interaction
         if (cmd === "cuointc") {
-          await interaction.deferReply();
           return this.handleCuoiNPC(interaction);
         }
 
@@ -82,18 +81,19 @@ module.exports = {
     const player = await bank.getPlayer(userId);
 
     if (player.tutien.daoLu && player.tutien.daoLu.hasPartner) {
-      // ✨ FIX: Đổi sang editReply vì lệnh này đã có deferReply gánh
-      return interaction.editReply({
+      return interaction.reply({
         content:
           "⚠️ **Tham lam vô độ!** Đạo hữu đã có một vị Đạo Lữ đồng hành rồi, không thể kết nạp thêm!",
+        ephemeral: true,
       });
     }
 
     const npcSelected = npcManager.DAN_SACH_NPC["tuyet_nhi"];
 
     if (player.balance < npcSelected.giaCuoi) {
-      return interaction.editReply({
+      return interaction.reply({
         content: `❌ **Nghèo túng đường tu!** Đạo hữu cần \`$${npcSelected.giaCuoi.toLocaleString()}\` Linh Thạch để rước **${npcSelected.ten}** làm Đạo Lữ. Bạn hiện chỉ có \`$${player.balance.toLocaleString()}\`.`,
+        ephemeral: true,
       });
     }
 
@@ -106,7 +106,7 @@ module.exports = {
     };
 
     await bank.save();
-    return interaction.editReply({
+    return interaction.reply({
       content: `🎉 **THÀNH THÂN ĐẠI CÁT!** Đạo hữu đã tiêu hao **$${npcSelected.giaCuoi.toLocaleString()}** Linh Thạch, chính thức rước **${npcSelected.ten}** (${npcSelected.xuatThan}) về làm Đạo Lữ đồng môn! Từ nay gắn kết vận mệnh, cùng nhau nghịch thiên.`,
     });
   },
