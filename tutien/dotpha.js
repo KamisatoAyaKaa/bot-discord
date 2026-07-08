@@ -1,7 +1,7 @@
 const bank = require("../bank.js");
-const { DANH_SACH_LINH_CAN } = require("./profile.js");
+const { NGO_TINH, THE_CHAT, KHI_VAN } = require("./properties.js");
 
-// Danh sách 11 Đại Cảnh Giới đồng bộ 100%
+// Danh sách 11 Đại Cảnh Giới
 const CAC_CANH_GIOI = [
   "Phàm Nhân", // Cấp 1
   "Luyện Khí", // Cấp 2
@@ -15,6 +15,23 @@ const CAC_CANH_GIOI = [
   "Độ Kiếp", // Cấp 10
   "Chân Tiên", // Cấp 11
 ];
+
+// Tỷ lệ gốc theo tầng (áp dụng Luyện Khí trở xuống)
+function tyLeGocTheoTang(tang) {
+  if (tang >= 7) return 35; // Tầng 7 -> 9
+  if (tang >= 4) return 55; // Tầng 4 -> 6
+  return 80; // Tầng 1 -> 3
+}
+
+// Từ Trúc Cơ trở lên: mỗi đại cảnh giới cao hơn giảm thêm 6% (tối thiểu 8%)
+function tyLeGocTheoCanhGioi(canhGioi, tang) {
+  const tyLe = tyLeGocTheoTang(tang);
+  const index = CAC_CANH_GIOI.indexOf(canhGioi);
+  if (index < 2) return tyLe; // Phàm Nhân, Luyện Khí giữ nguyên
+
+  const capDoCanhGioi = index - 1; // Trúc Cơ=1, Kim Đan=2, ...
+  return Math.max(tyLe - capDoCanhGioi * 6, 8);
+}
 
 async function handleDotPha(interaction) {
   const userId = interaction.user.id;
@@ -41,10 +58,12 @@ async function handleDotPha(interaction) {
     );
   }
 
-  // 2. Tính toán tỉ lệ thành công dựa trên số Tầng hiện tại
-  let tyLeGoc = 80; // Tầng 1 -> 3
-  if (tt.tang >= 4 && tt.tang <= 6) tyLeGoc = 55; // Tầng 4 -> 6
-  if (tt.tang >= 7) tyLeGoc = 35; // Tầng 7 -> 9
+  // 2. Tính toán tỉ lệ thành công theo Tầng + Đại Cảnh Giới
+  const indexCanhGioi = CAC_CANH_GIOI.indexOf(tt.canhGioi);
+  let tyLeGoc = tyLeGocTheoCanhGioi(tt.canhGioi, tt.tang);
+
+  // Đột phá đại cảnh giới (Tầng 9 -> cảnh giới mới): lôi kiếp nặng hơn
+  if (tt.tang === 9) tyLeGoc = Math.max(tyLeGoc - 12, 5);
 
   // Bonus tỉ lệ may mắn từ phẩm chất Linh Căn đã bốc quẻ
   let bonusLinhCan = 0;
@@ -52,7 +71,17 @@ async function handleDotPha(interaction) {
   if (tt.linhCan.includes("Biến Dị")) bonusLinhCan = 12;
   if (tt.linhCan.includes("Thiên")) bonusLinhCan = 25;
 
-  const tyLeTong = Math.min(tyLeGoc + bonusLinhCan, 95); // Tối đa 95% thành công
+  const ntObj = NGO_TINH.find((nt) => nt.name === tt.ngoTinh) || NGO_TINH[1];
+  const tcObj = THE_CHAT.find((tc) => tc.name === tt.theChat) || THE_CHAT[0];
+  const kvObj = KHI_VAN.find((kv) => kv.name === tt.khiVan) || KHI_VAN[1];
+  const bonusSoMenh =
+    ntObj.breakBonus + tcObj.breakBonus + kvObj.breakBonus;
+
+  const tyLeToiDa = indexCanhGioi >= 2 ? 88 : 95; // Trúc Cơ+ không vượt quá 88%
+  const tyLeTong = Math.max(
+    5,
+    Math.min(tyLeGoc + bonusLinhCan + bonusSoMenh, tyLeToiDa),
+  );
   const xucXac = Math.random() * 100;
 
   // =========================================================
